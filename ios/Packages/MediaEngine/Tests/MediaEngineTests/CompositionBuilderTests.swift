@@ -128,7 +128,9 @@ private extension MediaTime {
 
 /// Test için küçük H.264 video üretir (düz renk kareler, ses yok).
 enum TestVideo {
-    static func make(in dir: URL, seconds: Int, size: CGSize = CGSize(width: 320, height: 180), fps: Int32 = 30) async throws -> URL {
+    /// - Parameter brightness: Kare başına gri ton (0 siyah); nil ise kareler değişir.
+    static func make(in dir: URL, seconds: Int, size: CGSize = CGSize(width: 320, height: 180), fps: Int32 = 30,
+                     brightness: UInt8? = nil) async throws -> URL {
         let url = dir.appendingPathComponent("test-\(UUID().uuidString).mov")
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
         let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
@@ -153,7 +155,7 @@ enum TestVideo {
             guard let buffer else { throw MediaEngineError.exportFailed("pixel buffer") }
             CVPixelBufferLockBaseAddress(buffer, [])
             let base = CVPixelBufferGetBaseAddress(buffer)!
-            memset(base, Int32(frame * 4 % 255), CVPixelBufferGetDataSize(buffer))
+            memset(base, Int32(brightness ?? UInt8(frame * 4 % 255)), CVPixelBufferGetDataSize(buffer))
             CVPixelBufferUnlockBaseAddress(buffer, [])
             adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: fps))
         }

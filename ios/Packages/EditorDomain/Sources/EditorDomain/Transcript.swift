@@ -78,6 +78,15 @@ public struct CaptionTrack: Equatable, Sendable, Codable {
         public var sourceEnd: MediaTime
         public var confidence: Double?
 
+        public init(id: String, text: String, display: String, sourceStart: MediaTime, sourceEnd: MediaTime, confidence: Double? = nil) {
+            self.id = id
+            self.text = text
+            self.display = display
+            self.sourceStart = sourceStart
+            self.sourceEnd = sourceEnd
+            self.confidence = confidence
+        }
+
         public var range: TimeRange { TimeRange(start: sourceStart, end: sourceEnd) }
     }
 

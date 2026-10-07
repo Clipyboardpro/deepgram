@@ -2,29 +2,39 @@ import SwiftUI
 import AVKit
 import EditorDomain
 
-/// 9:16 önizleme + o anki altyazı satırı. Altyazı burada SwiftUI katmanıdır;
-/// dışa aktarmada videoya ayrıca işlenir (RenderPlan, sonraki adım).
+/// 9:16 önizleme + o anki altyazı satırı. Satırın punto, genişlik ve konumu
+/// `CaptionStyle`'dan kanvasa oranla hesaplanır; dışa aktarmadaki katmanla
+/// aynı geometri (kutu alttan `bottomMargin`, yüksekliği 2,6 × punto, metin üstte).
 struct PreviewView: View {
     let editor: ProjectEditorModel
+    private let style = CaptionStyle.standard
 
     var body: some View {
         let canvas = editor.document.canvas
-        ZStack(alignment: .bottom) {
-            VideoPlayer(player: editor.playback.player)
-                .disabled(true)   // kendi kontrollerimiz var
-            if let caption = editor.currentCaption {
-                Text(caption)
-                    .font(.system(size: 20, weight: .bold))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.8), radius: 2)
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 48)
+        GeometryReader { proxy in
+            let scale = proxy.size.height / CGFloat(canvas.height)
+            let fontSize = CGFloat(style.fontSize(forCanvasHeight: Double(canvas.height))) * scale
+            ZStack(alignment: .bottom) {
+                VideoPlayer(player: editor.playback.player)
+                    .disabled(true)   // kendi kontrollerimiz var
+                if let caption = editor.currentCaption {
+                    Text(caption)
+                        .font(.system(size: fontSize, weight: .bold))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.85), radius: fontSize * 0.08)
+                        .frame(width: CGFloat(style.maxWidth(forCanvasWidth: Double(canvas.width))) * scale,
+                               height: fontSize * 2.6, alignment: .top)
+                        .padding(.bottom, CGFloat(style.bottomMargin(forCanvasHeight: Double(canvas.height))) * scale)
+                        .allowsHitTesting(false)
+                }
             }
+            .frame(width: proxy.size.width, height: proxy.size.height)
         }
         .aspectRatio(CGFloat(canvas.width) / CGFloat(canvas.height), contentMode: .fit)
         .background(.black)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .contentShape(Rectangle())
         .onTapGesture { editor.playback.togglePlay() }
     }
 }

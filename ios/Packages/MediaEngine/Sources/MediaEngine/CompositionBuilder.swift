@@ -57,6 +57,7 @@ public struct CompositionBuilder: Sendable {
         var instructions: [AVMutableVideoCompositionInstruction] = []
         let audioParameters = AVMutableAudioMixInputParameters(track: audioTrack)
         var cursor = CMTime.zero
+        var hasAnyAudio = false
 
         for clip in clips {
             guard let media = document.asset(clip.mediaId) else { throw CompositionError.missingMedia(clip.mediaId) }
@@ -93,6 +94,7 @@ public struct CompositionBuilder: Sendable {
                 try videoTrack.insertTimeRange(sourceRange, of: sourceVideo, at: cursor)
                 if let sourceAudio {
                     try audioTrack.insertTimeRange(sourceRange, of: sourceAudio, at: cursor)
+                    hasAnyAudio = true
                 } else {
                     audioTrack.insertEmptyTimeRange(CMTimeRange(start: cursor, duration: sourceRange.duration))
                 }
@@ -124,8 +126,15 @@ public struct CompositionBuilder: Sendable {
         videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(max(1, document.canvas.fps)))
         videoComposition.instructions = instructions
 
-        let audioMix = AVMutableAudioMix()
-        audioMix.inputParameters = [audioParameters]
+        // Hiç ses yoksa boş ses kanalı bırakma (dışa aktarmada sorun çıkarır).
+        var audioMix: AVMutableAudioMix?
+        if hasAnyAudio {
+            let mix = AVMutableAudioMix()
+            mix.inputParameters = [audioParameters]
+            audioMix = mix
+        } else {
+            composition.removeTrack(audioTrack)
+        }
 
         return BuiltComposition(composition: composition, videoComposition: videoComposition, audioMix: audioMix, revision: document.revision)
     }
