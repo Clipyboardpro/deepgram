@@ -67,6 +67,30 @@ private struct EditorContent: View {
                     Label("Video ekle", systemImage: "plus")
                 }
                 .disabled(editor.isImporting)
+                Button { editor.startExport() } label: {
+                    Label("Dışa aktar", systemImage: "square.and.arrow.up")
+                }
+                .disabled(document.duration == .zero || editor.exportState != .idle)
+            }
+        }
+        .overlay {
+            if case let .exporting(progress) = editor.exportState {
+                VStack(spacing: 12) {
+                    ProgressView(value: progress) { Text("Video hazırlanıyor…") }
+                        .frame(width: 220)
+                    Button("Vazgeç", role: .cancel) { editor.cancelExport() }
+                }
+                .padding()
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        .sheet(isPresented: Binding(
+            get: { if case .finished = editor.exportState { true } else { false } },
+            set: { if !$0 { editor.dismissExport() } }
+        )) {
+            if case let .finished(url) = editor.exportState {
+                ExportDoneView(url: url) { editor.dismissExport() }
+                    .presentationDetents([.medium])
             }
         }
         .task { await editor.refreshPreview() }
@@ -90,6 +114,32 @@ private struct EditorContent: View {
         } message: {
             Text(editor.errorMessage ?? "")
         }
+    }
+}
+
+/// Dışa aktarma bitti: paylaş / Fotoğraflar'a kaydet (paylaşım ekranından).
+private struct ExportDoneView: View {
+    let url: URL
+    let done: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(.green)
+            Text("Video hazır")
+                .font(.title2.bold())
+            Text("Paylaşım ekranından \"Videoyu Kaydet\" ile Fotoğraflar'a ekleyebilirsin.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            ShareLink(item: url) {
+                Label("Paylaş veya kaydet", systemImage: "square.and.arrow.up")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            Button("Kapat", action: done)
+        }
+        .padding(24)
     }
 }
 

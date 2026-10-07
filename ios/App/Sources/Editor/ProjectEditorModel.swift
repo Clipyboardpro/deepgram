@@ -71,15 +71,58 @@ final class ProjectEditorModel {
         return clips.first { $0.timelineRange.contains(playback.currentTime) }?.clipId
     }
 
-    /// Önizlemede o an gösterilecek altyazı satırı.
+    /// Önizlemede o an gösterilecek altyazı satırı (dışa aktarmayla aynı kurallar).
     var currentCaption: String? {
-        let builder = CaptionLineBuilder()
-        let time = playback.currentTime
-        for track in document.captionTracks {
-            let lines = builder.lines(from: document.timelineWords(for: track))
-            if let line = lines.first(where: { $0.range.contains(time) }) { return line.text }
+        RenderPlan.cue(at: playback.currentTime, in: RenderPlan.captionCues(for: document))?.text
+    }
+
+    // MARK: - Dışa aktarma
+
+    enum ExportState: Equatable {
+        case idle
+        case exporting(progress: Double)
+        case finished(URL)
+    }
+
+    private(set) var exportState: ExportState = .idle
+    @ObservationIgnored private var exportTask: Task<Void, Never>?
+
+    /// Projenin şu anki hâlini 1080p MP4 olarak dışa aktarır (altyazılar videoya işlenir).
+    func startExport() {
+        guard exportTask == nil else { return }
+        let document = history.present
+        let name = (document.title ?? "Video").replacingOccurrences(of: "/", with: "-")
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("Exports", isDirectory: true)
+        let destination = folder.appendingPathComponent("\(name).mp4")
+        exportState = .exporting(progress: 0)
+        playback.player.pause()
+
+        exportTask = Task { [builder] in
+            defer { exportTask = nil }
+            do {
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let url = try await Exporter(builder: builder).export(document, to: destination) { value in
+                    Task { @MainActor [weak self] in
+                        if case .exporting = self?.exportState { self?.exportState = .exporting(progress: value) }
+                    }
+                }
+                exportState = .finished(url)
+            } catch ExportError.canceled {
+                exportState = .idle
+            } catch {
+                exportState = .idle
+                errorMessage = "Video dışa aktarılamadı."
+            }
         }
-        return nil
+    }
+
+    func cancelExport() {
+        exportTask?.cancel()
+    }
+
+    func dismissExport() {
+        if case let .finished(url) = exportState { try? FileManager.default.removeItem(at: url) }
+        exportState = .idle
     }
 
     var document: ProjectDocument { history.present }
