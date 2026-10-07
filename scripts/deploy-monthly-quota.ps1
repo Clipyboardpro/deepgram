@@ -7,35 +7,42 @@ param(
   [switch]$Approved
 )
 $ErrorActionPreference = 'Stop'
+# Windows PowerShell 5.1 uyumu: yerel komutların stderr'i Stop altında hata sayılmasın;
+# başarı yalnız $LASTEXITCODE ile denetlenir.
+$PSNativeCommandUseErrorActionPreference = $false
 if (-not $Approved) { throw 'Explicit CX-008 deployment approval required' }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Push-Location $repoRoot
 $previousPassword = $env:SUPABASE_DB_PASSWORD
 $pepper = $null
+function Invoke-Native([scriptblock]$Command) {
+  $ErrorActionPreference = 'Continue'
+  & $Command
+}
 function Invoke-SafeSupabase([string[]]$CliArgs) {
-  $result = & npx --yes supabase@2.120.0 @CliArgs 2>&1
+  $result = Invoke-Native { & npx --yes supabase@2.120.0 @CliArgs 2>&1 }
   if ($LASTEXITCODE -ne 0) { $result=$null; throw 'Supabase operation failed; sensitive output suppressed' }
   $result=$null
 }
 try {
-  $pr = (& gh pr view $PullRequest --repo Eyyogang/deepgram --json state,headRefOid,baseRefName | ConvertFrom-Json)
+  $pr = (Invoke-Native { & gh pr view $PullRequest --repo Eyyogang/deepgram --json state,headRefOid,baseRefName 2>$null } | ConvertFrom-Json)
   if ($LASTEXITCODE -ne 0 -or $pr.state -ne 'MERGED' -or $pr.baseRefName -ne 'main' -or $pr.headRefOid -ne $ExpectedHead) {
     throw 'Expected CX-008 PR must already be merged by Claude; this script never merges'
   }
-  $checks = @(& gh pr checks $PullRequest --repo Eyyogang/deepgram --json name,state | ConvertFrom-Json)
+  $checks = @(Invoke-Native { & gh pr checks $PullRequest --repo Eyyogang/deepgram --json name,state 2>$null } | ConvertFrom-Json)
   if ($LASTEXITCODE -ne 0) { throw 'PR checks not green' }
   foreach ($name in @('supabase','standalone-postgres')) {
     if (-not ($checks | Where-Object { $_.name -eq $name -and $_.state -eq 'SUCCESS' })) { throw 'Required backend checks not green' }
   }
   $localHead = (& git rev-parse HEAD).Trim()
   if ($LASTEXITCODE -ne 0 -or $localHead -ne $ExpectedHead -or (& git status --porcelain)) { throw 'Deploy checkout must be the exact clean reviewed commit' }
-  & git fetch origin main:refs/remotes/origin/main
+  Invoke-Native { & git fetch origin main:refs/remotes/origin/main 2>&1 } | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'Unable to verify main' }
-  & git merge-base --is-ancestor $ExpectedHead origin/main
+  Invoke-Native { & git merge-base --is-ancestor $ExpectedHead origin/main 2>&1 } | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'Reviewed commit not present in main' }
   $ref = 'yjtpfyowzyszeoitlubx'
   if ([IO.File]::ReadAllText((Join-Path $repoRoot 'backend/supabase/.temp/project-ref')).Trim() -ne $ref) { throw 'Linked project mismatch' }
-  $secrets = & npx --yes supabase@2.120.0 secrets list --project-ref $ref --output json 2>$null | ConvertFrom-Json
+  $secrets = Invoke-Native { & npx --yes supabase@2.120.0 secrets list --project-ref $ref --output json 2>$null } | ConvertFrom-Json
   if ($LASTEXITCODE -ne 0) { throw 'Unable to inspect secret names' }
   if ($secrets | Where-Object { $_.name -eq 'FREE_QUOTA_PEPPER' }) {
     throw 'Pepper already exists: do not rotate. Reconcile partial deploy manually without changing pepper'
@@ -48,8 +55,10 @@ try {
   Invoke-SafeSupabase -CliArgs @('db','push','--workdir','backend','--skip-vault','--yes')
   Write-Output 'Reviewed CX-007/008 migrations applied.'
   $randomBytes = New-Object byte[] 32
-  [Security.Cryptography.RandomNumberGenerator]::Fill($randomBytes)
-  $pepper = [Convert]::ToHexString($randomBytes).ToLowerInvariant()
+  # .NET Framework (PowerShell 5.1) uyumlu: statik Fill/ToHexString yok.
+  $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+  try { $rng.GetBytes($randomBytes) } finally { $rng.Dispose() }
+  $pepper = -join ($randomBytes | ForEach-Object { $_.ToString('x2') })
   [Array]::Clear($randomBytes,0,$randomBytes.Length)
   Invoke-SafeSupabase -CliArgs @('secrets','set','--project-ref',$ref,'FREE_QUOTA_SECONDS=900',('FREE_QUOTA_PEPPER='+$pepper))
   $pepper=$null
