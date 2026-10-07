@@ -10,6 +10,8 @@ public struct ProjectDocument: Equatable, Sendable, Codable {
     public var projectId: UUID
     /// Her düzenlemede bir artar. Dışa aktarma sabit bir revision üzerinde çalışır.
     public var revision: Int
+    /// Kullanıcının verdiği ad. Eski dosyalarda yoktur (opsiyonel; şema v1).
+    public var title: String?
     public var canvas: Canvas
     public var mediaAssets: [MediaAsset]
     public var tracks: [Track]
@@ -20,6 +22,7 @@ public struct ProjectDocument: Equatable, Sendable, Codable {
 
     public init(
         projectId: UUID = UUID(),
+        title: String? = nil,
         canvas: Canvas = .vertical1080p,
         mediaAssets: [MediaAsset] = [],
         tracks: [Track] = [],
@@ -30,6 +33,7 @@ public struct ProjectDocument: Equatable, Sendable, Codable {
         self.schemaVersion = Self.currentSchemaVersion
         self.projectId = projectId
         self.revision = 0
+        self.title = title
         self.canvas = canvas
         self.mediaAssets = mediaAssets
         self.tracks = tracks
