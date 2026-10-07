@@ -4,8 +4,8 @@ import CoreTransferable
 import UniformTypeIdentifiers
 import EditorDomain
 
-/// Düzenleyici ekranı (ilk sürüm): video ekleme, klip listesi, geri al/yinele.
-/// Zaman çizelgesi ve önizleme sonraki adımda (MediaEngine önizleme + EditorUI).
+/// Düzenleyici ekranı: önizleme, oynatma, zaman çizelgesi (seç, böl, sil),
+/// video ekleme, geri al/yinele.
 struct ProjectDetailView: View {
     @Environment(ProjectLibraryModel.self) private var library
     let projectId: UUID
@@ -33,30 +33,22 @@ private struct EditorContent: View {
 
     var body: some View {
         let document = editor.document
-        List {
-            Section {
-                LabeledContent("Süre", value: DurationText.format(document.duration))
-                LabeledContent("Kanvas", value: "\(document.canvas.width)×\(document.canvas.height), \(document.canvas.fps) fps")
-            }
-            Section("Klipler") {
-                let clips = document.tracks.filter { $0.kind == .video }.flatMap(\.clips)
-                if clips.isEmpty {
-                    Text("Henüz video yok. Sağ üstten video ekle.")
-                        .foregroundStyle(.secondary)
+        VStack(spacing: 12) {
+            if document.tracks.allSatisfy({ $0.clips.isEmpty }) {
+                ContentUnavailableView {
+                    Label("Henüz video yok", systemImage: "film")
+                } description: {
+                    Text("Sağ üstteki + ile Fotoğraflar'dan video ekle.")
                 }
-                ForEach(clips, id: \.clipId) { clip in
-                    HStack {
-                        Image(systemName: "film")
-                        VStack(alignment: .leading) {
-                            Text("\(DurationText.format(clip.timelineRange.start)) – \(DurationText.format(clip.timelineRange.end))")
-                            if clip.playbackRate != 1 {
-                                Text("\(clip.playbackRate, format: .number)x").font(.caption).foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
+            } else {
+                PreviewView(editor: editor)
+                    .padding(.horizontal)
+                TransportBar(editor: editor)
+                TimelineStrip(editor: editor)
             }
+            Spacer(minLength: 0)
         }
+        .padding(.top, 8)
         .overlay {
             if editor.isImporting {
                 ProgressView("Video ekleniyor…")
@@ -77,6 +69,7 @@ private struct EditorContent: View {
                 .disabled(editor.isImporting)
             }
         }
+        .task { await editor.refreshPreview() }
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
             pickerItem = nil
