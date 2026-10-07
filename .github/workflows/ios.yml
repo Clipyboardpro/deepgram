@@ -1,7 +1,8 @@
-name: iOS paket testleri
+name: iOS paket testleri ve uygulama derlemesi
 
 # Sahip: Claude (ios/**). Swift paketleri yalnız Foundation'a bağlı olduğu için
-# Linux'ta test edilir; Xcode/iOS derlemesi Mac gerektirir ve ayrıca eklenecek.
+# Linux'ta test edilir. Uygulama hedefi (SwiftUI) macOS koşucusunda derlenir;
+# macOS dakikaları pahalı olduğu için yalnız PR ve main'de, iOS kodu değişince.
 # contracts/** değişince de çalışır: EditorDomain'deki sözleşme testi sunucu
 # transcript örneğini Swift tarafında doğrular.
 on:
@@ -27,7 +28,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [EditorDomain, AIJobsClient]
+        package: [EditorDomain, AIJobsClient, ProjectLibrary]
 
     steps:
       - name: Depoyu çek
@@ -36,3 +37,34 @@ jobs:
       - name: ${{ matrix.package }} testleri
         working-directory: ios/Packages/${{ matrix.package }}
         run: swift test
+
+  ios-app:
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Depoyu çek
+        uses: actions/checkout@v4
+
+      - name: Xcode sürümü
+        run: xcodebuild -version
+
+      - name: XcodeGen kur
+        run: brew install xcodegen
+
+      - name: Xcode projesini üret
+        working-directory: ios/App
+        run: xcodegen generate
+
+      - name: iOS simülatörü için derle (imzasız)
+        working-directory: ios/App
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project VideoEditor.xcodeproj \
+            -scheme VideoEditor \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            | tail -n 40
