@@ -871,6 +871,20 @@
         },
       },
     },
+    "/v1/quota/free-claim": {
+      "post": {
+        "operationId": "claimFreeQuota",
+        "summary": "Doğrulanmış kimliğin tek ücretsiz hakkını talep et",
+        "description": "JWT zorunlu; gövde yok (gövde gönderilirse 400). Kimlik ve miktar istemciden alınmaz. Anonim veya e-postası doğrulanmamış (Apple kimliği olmayan) kullanıcı 403 free_quota_not_eligible. Tek hak atomik/idempotent; tekrar 200 granted:false. Miktar/geçerlilik sunucunun FREE_QUOTA_SECONDS/FREE_QUOTA_VALID_DAYS ayarı; 60 sn/7 gün yalnız test yer tutucusudur, K4 kararı değildir. Pepper/config eksikse 503 free_quota_not_configured. İstemci ardından GET /v1/quota okur.",
+        "responses": {
+          "200": {"description": "granted bu çağrıda yeni hak verildi mi?", "content": {"application/json": {"schema": {"type": "object", "required": ["granted"], "properties": {"granted": {"type": "boolean"}}}}}},
+          "400": {"description": "Gövde kabul edilmez.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "401": {"description": "Geçerli JWT yok.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "403": {"description": "free_quota_not_eligible", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},
+          "503": {"description": "free_quota_not_configured veya auth_unavailable", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}}
+        }
+      }
+    },
     "/v1/quota": {
       "get": {
         "operationId": "getQuota",

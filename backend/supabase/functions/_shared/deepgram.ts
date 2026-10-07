@@ -1,6 +1,7 @@
 import {
   FakeProvider,
   type ProviderCallback,
+  ProviderRejected,
   type ProviderSubmission,
   type Submission,
   type Transcript,
@@ -61,7 +62,10 @@ export class DeepgramProvider implements TranscriptionProvider {
       throw new Error("Provider submission outcome unknown");
     }
     if (!response.ok) {
-      await response.body?.cancel();
+      await response.body?.cancel().catch(() => {});
+      if (response.status >= 400 && response.status < 500) {
+        throw new ProviderRejected();
+      }
       throw new Error("Provider submission failed");
     }
     let body: Record<string, unknown>;

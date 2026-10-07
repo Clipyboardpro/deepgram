@@ -6,6 +6,10 @@ const required = (key: string) => {
   return value;
 };
 const url = required("SUPABASE_URL");
+assert(
+  ["http://127.0.0.1:54321", "http://localhost:54321"].includes(url),
+  "Disposable local stack only",
+);
 const admin = createClient(url, required("SUPABASE_SERVICE_ROLE_KEY"), {
   auth: { persistSession: false, autoRefreshToken: false },
 });
@@ -211,6 +215,17 @@ try {
     (await api("/v1/quota", owner.token)).periods[0].reservedSeconds,
     0,
   );
+  assertEquals(await api("/v1/quota/free-claim", owner.token, "POST"), {
+    granted: true,
+  });
+  assertEquals(await api("/v1/quota/free-claim", owner.token, "POST"), {
+    granted: false,
+  });
+  const freePeriods = (await api("/v1/quota", owner.token)).periods.filter((
+    period: { source: string },
+  ) => period.source === "free");
+  assertEquals(freePeriods.length, 1);
+  assertEquals(freePeriods[0].grantedSeconds, 60);
   console.log(
     "PASS: gerçek Auth/JWT, kota, idempotency, sahiplik, signed upload, queued GET, cancel; dispatcher yok.",
   );

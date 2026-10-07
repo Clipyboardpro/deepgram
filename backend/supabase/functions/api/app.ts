@@ -137,5 +137,11 @@ export function createApp(repo: Repository, pipeline?: PipelineOptions) {
     }));
     return c.json({ periods });
   });
+  app.post("/v1/quota/free-claim", async (c) => {
+    if ((await c.req.text()).length !== 0) {
+      throw new ApiError(400, "invalid_request");
+    }
+    return c.json({ granted: await repo.freeClaim(c.get("userId")) });
+  });
   return app;
 }

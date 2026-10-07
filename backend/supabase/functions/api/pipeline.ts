@@ -4,7 +4,7 @@ import { ApiError } from "./errors.ts";
 import { AudioError } from "../_shared/audio.ts";
 import { verifyDispatch } from "../_shared/dispatch-auth.ts";
 import { isTranscript } from "../_shared/transcript.ts";
-import { FakeProvider } from "../_shared/provider.ts";
+import { FakeProvider, ProviderRejected } from "../_shared/provider.ts";
 import type { TranscriptionProvider } from "../_shared/provider.ts";
 import type {
   Callback,
@@ -188,7 +188,13 @@ export function createPipeline(options: PipelineOptions) {
                 }/functions/v1/api/v1/providers/${job.provider}/callback/${job.id}/${token}`,
               });
               requestId = result.requestId;
-            } catch {
+            } catch (error) {
+              if (error instanceof ProviderRejected) {
+                await retry(() => repo.fail(job!.id, "provider_rejected"));
+                await repo.ack(message.msg_id);
+                acknowledged++;
+                continue;
+              }
               await repo.markUnknown(job.id);
               throw new ApiError(503, "submission_outcome_unknown");
             }

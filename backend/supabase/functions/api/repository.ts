@@ -1,6 +1,12 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { ApiError, databaseError } from "./errors.ts";
 import type { Transcript } from "../_shared/provider.ts";
+import {
+  freeIdentity,
+  freeIdentityHash,
+  type FreeQuotaConfig,
+  freeQuotaConfig,
+} from "../_shared/free-quota.ts";
 
 export interface CreateJob {
   clientRequestId: string;
@@ -47,6 +53,7 @@ export interface Repository {
   upload(job: JobRow): Promise<Upload | null>;
   result(userId: string, id: string): Promise<JobResult | null>;
   quota(userId: string): Promise<QuotaPeriod[]>;
+  freeClaim(userId: string): Promise<boolean>;
 }
 const bucket = "transcription-audio";
 const columns =
@@ -57,6 +64,7 @@ export class SupabaseRepository implements Repository {
     private readonly provider: string,
     private readonly model: string,
     private readonly externalUrl: string,
+    private readonly freeConfig: () => FreeQuotaConfig = freeQuotaConfig,
   ) {}
   async authenticate(token: string): Promise<string | null> {
     const { data, error } = await this.admin.auth.getUser(token);
@@ -164,6 +172,26 @@ export class SupabaseRepository implements Repository {
   }
   quota(userId: string): Promise<QuotaPeriod[]> {
     return this.rpc("quota_balance", { p_user_id: userId });
+  }
+  async freeClaim(userId: string): Promise<boolean> {
+    // Auth.getUser ile doğrulanan id'nin güncel Auth kaydı; client metadata yok.
+    const { data, error } = await this.admin.auth.admin.getUserById(userId);
+    if (error || !data.user || data.user.id !== userId) {
+      throw new ApiError(503, "auth_unavailable");
+    }
+    freeIdentity(data.user);
+    const config = this.freeConfig();
+    const identityHash = await freeIdentityHash(data.user, config.pepper);
+    const period = await this.rpc<{ id: string } | null>(
+      "grant_free_quota_once",
+      {
+        p_user_id: userId,
+        p_identity_hash: identityHash,
+        p_seconds: config.seconds,
+        p_valid_for: `${config.validDays} days`,
+      },
+    );
+    return Boolean(period?.id);
   }
 }
 export function repositoryFromEnvironment(): Repository {

@@ -1,6 +1,6 @@
 import { assertEquals, assertMatch } from "@std/assert";
 import { createApp } from "../api/app.ts";
-import { databaseError } from "../api/errors.ts";
+import { ApiError, databaseError } from "../api/errors.ts";
 import { FakeProvider } from "../_shared/provider.ts";
 import type { JobRow, Repository } from "../api/repository.ts";
 
@@ -38,6 +38,10 @@ function fixture() {
     upload: () => Promise.resolve(null),
     result: () => Promise.resolve(null),
     quota: () => Promise.resolve([]),
+    freeClaim: (user) => {
+      calls.push(user);
+      return Promise.resolve(true);
+    },
   };
   return { app: createApp(repo), repo, calls };
 }
@@ -52,6 +56,47 @@ const headers = {
   Authorization: "Bearer valid",
   "Content-Type": "application/json",
 };
+Deno.test("free-claim: JWT zorunlu, gövde yok, güvenilir kullanıcı ve granted boolean", async () => {
+  const { app, repo, calls } = fixture();
+  for (const token of [undefined, "Bearer invalid"]) {
+    const r = await app.request("/v1/quota/free-claim", {
+      method: "POST",
+      headers: token ? { Authorization: token } : {},
+    });
+    assertEquals(r.status, 401);
+    await r.json();
+  }
+  const injected = await app.request("/v1/quota/free-claim", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ userId: "attacker", seconds: 999 }),
+  });
+  assertEquals(injected.status, 400);
+  await injected.json();
+  assertEquals(calls, []);
+  const first = await app.request("/v1/quota/free-claim", {
+    method: "POST",
+    headers,
+  });
+  assertEquals(await first.json(), { granted: true });
+  assertEquals(calls, ["trusted-user"]);
+  repo.freeClaim = () => Promise.resolve(false);
+  const repeat = await app.request("/v1/quota/free-claim", {
+    method: "POST",
+    headers,
+  });
+  assertEquals(repeat.status, 200);
+  assertEquals(await repeat.json(), { granted: false });
+  repo.freeClaim = () => {
+    throw new ApiError(403, "free_quota_not_eligible");
+  };
+  const denied = await app.request("/v1/quota/free-claim", {
+    method: "POST",
+    headers,
+  });
+  assertEquals(denied.status, 403);
+  assertEquals((await denied.json()).error.code, "free_quota_not_eligible");
+});
 Deno.test("kimliksiz/geçersiz JWT hiçbir iş okuyamaz", async () => {
   const { app, calls } = fixture();
   for (const token of [undefined, "Bearer invalid", "Basic valid"]) {

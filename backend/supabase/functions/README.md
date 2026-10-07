@@ -85,6 +85,38 @@ değildir; saldırganca hazırlanmış sample metadata'yı tam decode ederek kan
 tam decode kanıtı henüz yoktur. Deepgram callback süresi preflight ile en fazla
 250 ms farklı olabilir; daha büyük fark sonuç mutasyonu yapmadan reddedilir.
 
+## CX-007 · ücretsiz hak ve kesin ret
+
+`POST /v1/quota/free-claim`: JWT zorunlu, boş gövde, yanıt `{granted:boolean}`.
+Auth.getUser ile doğrulanan kullanıcının güncel Auth kaydı tekrar okunur.
+Anonim veya doğrulanmamış e-posta (Apple kimliği yoksa) → 403
+`free_quota_not_eligible`. User metadata/client kimlik veya miktarı kullanılmaz.
+Apple identity_data.sub veya doğrulanmış küçük-harf e-posta, sunucu pepper'ıyla
+HMAC-SHA256 olur. Hash ve aynı kullanıcının free dönemi atomik kontrol edilir;
+tekrar / e-posta değişikliği / aynı kimlikle başka hesap yeni hak vermez.
+Hesap silinince hash tombstone korunur. Pepper sabit tutulmalı; döndürme işlemi
+eski kimlik hash'lerini uzlaştırmadan yapılmamalı.
+
+`FREE_QUOTA_PEPPER` rastgele >=32 karakter, `FREE_QUOTA_SECONDS` pozitif integer,
+`FREE_QUOTA_VALID_DAYS` 1..365 integer; eksik/bozuk config → 503
+`free_quota_not_configured`. `.env.example` içindeki 60 sn / 7 gün yalnız yerel
+test yer tutucusudur, K4/ürün kararı değildir. Canlı örnek pepper kullanılamaz.
+Yeni migration onaylı deploy'dan önce uygulanmalı; bu PR canlıya uygulanmadı.
+
+Deepgram 4xx → ProviderRejected → `failed/provider_rejected` + rezervasyon
+iadesi + ack (kör retry yok). Fail RPC geçici hatası üç kez yeniden denenir;
+bütün DB yazmaları başarısızsa lease ack edilmez, operatör incelemesi gerekir.
+Timeout/ağ/5xx/bozuk 2xx kabul `unknown_provider_state` kalır; bu belirsizlik
+ücretli çağrıyı kör tekrarlamaz. Raw sağlayıcı yanıtı loglanmaz.
+
+`scripts/report-auth.ps1` canlı ayarları salt okunur CLI diff ile allowlist
+alanlarından raporlar; Auth secrets ve istemci anahtarını basmaz. Çıktıda
+"no diff" alanları CLI'ın beyan edilmiş yerel ayarla aynı gördüğü alanlardır.
+Auth ayarları değişmez. Native Apple id_token akışı için Apple Developer App ID,
+bundle ID capability ve Supabase Client IDs gerekir. Web OAuth eklenirse
+Services ID, Team ID/Key ID/.p8 ile client secret (6 aylık yenileme) gerekir.
+[Supabase Apple akışları](https://supabase.com/docs/guides/auth/social-login/auth-apple).
+
 ## CX-004 · Deepgram adaptörü (ücretli test/aktivasyon kapalı)
 
 `TRANSCRIPTION_PROVIDER=deepgram`, `TRANSCRIPTION_MODEL=nova-3` ve

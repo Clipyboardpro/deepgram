@@ -96,4 +96,20 @@ check "eşzamanlı tekrar webhook kotayı bir kez düşüyor" "1|45" \
 check "eşzamanlı tekrar webhook tek sonuç yazıyor" 1 \
   "$("${PSQL[@]}" -c "select count(*) from public.job_results where job_id = '$JOB'")"
 
+# CX-007: aynı kullanıcı farklı kimlikle, sonra farklı kullanıcı aynı kimlikle yarışır.
+hold_barrier
+for i in $(seq 1 10); do
+  at_barrier "select public.grant_free_quota_once('$U1', lpad('$i',64,'e'), 60, interval '7 days')" &
+done
+wait
+check "aynı kullanıcının eşzamanlı farklı kimlikleri tek ücretsiz hak" 1 \
+  "$("${PSQL[@]}" -c "select count(*) from public.quota_periods where user_id='$U1' and source='free'")"
+hold_barrier
+for user_id in "$U2" "$U3" "$U4"; do
+  at_barrier "select public.grant_free_quota_once('$user_id', repeat('f',64), 60, interval '7 days')" &
+done
+wait
+check "aynı kimlik eşzamanlı farklı kullanıcılara tek hak verir" 1 \
+  "$("${PSQL[@]}" -c "select count(*) from public.quota_periods where source_ref='free:' || repeat('f',64)")"
+
 exit $fail

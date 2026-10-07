@@ -246,6 +246,51 @@ Deno.test("submit sonucu belirsizse kör tekrar/ack yok", async () => {
   assertEquals(calls, ["check", "claim", "submit", "unknown"]);
 });
 
+Deno.test("Deepgram 4xx kesin ret failed/ack olur; unknown veya submit tekrarı yok", async () => {
+  for (const status of [400, 401, 402, 403, 408, 413, 415, 422, 429]) {
+    const http: typeof fetch = () =>
+      Promise.resolve(new Response("private provider error", { status }));
+    const { app, job, calls } = fixture(
+      new DeepgramProvider("mock-only", http),
+    );
+    const response = await app.request("/v1/internal/dispatch", {
+      method: "POST",
+      headers: await dispatchHeaders(secret),
+    });
+    assertEquals(await response.json(), { acknowledged: 1, deferred: 0 });
+    assertEquals(job.status, "failed");
+    assertEquals(calls, [
+      "check",
+      "claim",
+      "submit",
+      "provider_rejected",
+      "ack",
+    ]);
+  }
+});
+Deno.test("Deepgram timeout/5xx/bozuk 2xx kabul belirsiz kalır", async () => {
+  for (const kind of ["timeout", "500", "bad-acceptance"]) {
+    const http: typeof fetch = () => {
+      if (kind === "timeout") throw new Error("private");
+      return Promise.resolve(
+        new Response(kind === "500" ? "private" : "{}", {
+          status: kind === "500" ? 500 : 200,
+        }),
+      );
+    };
+    const { app, job, calls } = fixture(
+      new DeepgramProvider("mock-only", http),
+    );
+    const response = await app.request("/v1/internal/dispatch", {
+      method: "POST",
+      headers: await dispatchHeaders(secret),
+    });
+    assertEquals(await response.json(), { acknowledged: 0, deferred: 1 });
+    assertEquals(job.status, "unknown_provider_state");
+    assertEquals(calls, ["check", "claim", "submit", "unknown"]);
+  }
+});
+
 Deno.test("submit kabulünden sonra ilk mark hatası aynı requestId ile toparlanır", async () => {
   const { app, repo, job, calls } = fixture();
   const submitted = repo.submitted;
