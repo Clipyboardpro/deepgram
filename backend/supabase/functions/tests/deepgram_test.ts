@@ -147,6 +147,18 @@ Deno.test("Deepgram hata callback'i beyaz listedeki genel provider_failed olur",
     },
   );
 });
+
+Deno.test("300 sn sınırındaki encoder payı korunur; 250 ms üzeri reddedilir", () => {
+  const body = deepgramResult();
+  const provider = new DeepgramProvider("mock-only");
+  body.metadata.duration = 300.25;
+  assertEquals(
+    provider.parseCallback(body, "tr").transcript?.durationSeconds,
+    300.25,
+  );
+  body.metadata.duration = 300.251;
+  assertThrows(() => provider.parseCallback(body, "tr"));
+});
 Deno.test("5 dk sentetik 2000 Türkçe kelime callback'i 1 MiB sınırına sığar (gerçek ölçüm değil)", () => {
   const body = deepgramResult();
   body.metadata.duration = 300;

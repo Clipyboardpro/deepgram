@@ -97,7 +97,7 @@ etmek sonuç oluşturmaz; gerçek callback beklenir. Callback token + requestId
 kontrolü, native words → Transcript v1; display=punctuated_word. Kaynak video
 ofseti eklenmez. Başarısız callback'in özel hata metni saklanmaz.
 
-1 MiB callback sınırı korunur; tek kanal, en fazla 300 sn / 10000 kelime.
+1 MiB callback sınırı korunur; tek kanal, 300 sn + 250 ms encoder payı / 10000 kelime.
 2000 kelimelik sentetik 5 dk gövde testi bu sınıra sığar; gerçek Türkçe ölçümü
 değildir. Fazla büyük callback 413, bozuk veri 400; kota kesinleştirilmez.
 Gerçek WER/zamanlama/latans ve ücretli canlı iş yapılmadı: kullanıcı yalnız

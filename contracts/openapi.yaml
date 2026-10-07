@@ -194,7 +194,7 @@
                           "duration": {
                             "type": "number",
                             "exclusiveMinimum": 0,
-                            "maximum": 300,
+                            "maximum": 300.25,
                           },
                           "channels": { "type": "integer", "const": 1 },
                         },

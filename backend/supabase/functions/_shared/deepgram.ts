@@ -132,7 +132,7 @@ export class DeepgramProvider implements TranscriptionProvider {
       }),
     };
     if (
-      !isTranscript(transcript) || transcript.durationSeconds > 300 ||
+      !isTranscript(transcript) || transcript.durationSeconds > 300.25 ||
       transcript.words.some((word, index) =>
         index > 0 && word.start < transcript.words[index - 1].start
       )
