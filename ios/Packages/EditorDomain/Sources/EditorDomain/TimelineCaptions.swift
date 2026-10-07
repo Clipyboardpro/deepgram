@@ -12,7 +12,8 @@ public struct TimelineWord: Equatable, Sendable {
 public struct CaptionLine: Equatable, Sendable {
     public var words: [TimelineWord]
     public var range: TimeRange
-    public var text: String { words.map(\.text).joined(separator: " ") }
+    /// Gizlenmiş (boş metinli) kelimeler atlanır.
+    public var text: String { words.map(\.text).filter { !$0.isEmpty }.joined(separator: " ") }
 }
 
 extension ProjectDocument {
@@ -71,13 +72,13 @@ public struct CaptionLineBuilder: Sendable {
 
         for word in words {
             if let first = current.first, let last = current.last {
-                let length = (current.map(\.text) + [word.text]).joined(separator: " ").count
+                let length = (current.map(\.text) + [word.text]).filter { !$0.isEmpty }.joined(separator: " ").count
                 let breaks =
                     length > maxCharacters
                     || word.range.end - first.range.start > maxDuration
                     || word.range.start - last.range.end > maxGap
                     || last.clipId != word.clipId
-                    || Self.endsSentence(last.text)
+                    || Self.endsSentence(current.last { !$0.text.isEmpty }?.text ?? "")
                 if breaks { flush() }
             }
             current.append(word)

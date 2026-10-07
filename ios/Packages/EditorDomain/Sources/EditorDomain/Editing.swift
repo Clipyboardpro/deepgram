@@ -13,11 +13,26 @@ public enum EditCommand: Equatable, Sendable {
     case splitClip(clipId: UUID, at: MediaTime, newClipId: UUID)
     /// Kelimenin görünen metnini düzeltir; nil düzeltmeyi kaldırır.
     case correctWord(captionTrackId: UUID, wordId: String, text: String?)
+    /// Birden çok kelimeyi tek adımda düzeltir (satır düzenleme; tek geri al).
+    /// Boş metin kelimeyi gizler; nil düzeltmeyi kaldırır.
+    case correctWords(captionTrackId: UUID, corrections: [WordCorrection])
     /// Projeye içe alınmış medyayı kaydeder (dosya zaten proje klasöründe).
     case addMediaAsset(MediaAsset)
     /// Aynı medyanın altyazı kanalını ekler ya da yeni AI sonucuyla günceller.
     /// Mevcut kanal varsa kimliği, stili ve eşleşen kullanıcı düzeltmeleri korunur.
     case applyTranscript(mediaId: UUID, transcript: Transcript, audioSourceStart: MediaTime)
+}
+
+/// Tek kelimenin düzeltmesi: `text` nil ise düzeltme kaldırılır (AI metni
+/// görünür), boş ise kelime gizlenir.
+public struct WordCorrection: Equatable, Sendable {
+    public var wordId: String
+    public var text: String?
+
+    public init(wordId: String, text: String?) {
+        self.wordId = wordId
+        self.text = text
+    }
 }
 
 public enum EditError: Error, Equatable {
@@ -83,6 +98,16 @@ extension ProjectDocument {
                 doc.captionTracks[i].corrections[wordId] = text
             } else {
                 doc.captionTracks[i].corrections[wordId] = nil
+            }
+
+        case let .correctWords(captionTrackId, corrections):
+            guard let i = doc.captionTracks.firstIndex(where: { $0.captionTrackId == captionTrackId }) else {
+                throw EditError.captionTrackNotFound
+            }
+            let ids = Set(doc.captionTracks[i].words.map(\.id))
+            guard corrections.allSatisfy({ ids.contains($0.wordId) }) else { throw EditError.wordNotFound }
+            for correction in corrections {
+                doc.captionTracks[i].corrections[correction.wordId] = correction.text
             }
 
         case let .addMediaAsset(asset):
