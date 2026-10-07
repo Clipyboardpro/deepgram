@@ -18,6 +18,17 @@ final class ProjectCodecTests: XCTestCase {
         XCTAssertEqual(reopened.tracks[0].clips[0].sourceIn.timescale, 30000, "zaman ölçeği korunur")
     }
 
+    func testSaniyeAltiTarihKaydetAcSonrasiAyni() throws {
+        // Gerçek saat saniyenin altında değer taşır; yeniden açılan proje birebir aynı olmalı.
+        let created = ProjectDocument(createdAt: Date(timeIntervalSince1970: 1_791_000_000.123_456_7))
+        XCTAssertEqual(try ProjectCodec.decode(ProjectCodec.encode(created)), created)
+
+        let clip = Clip(clipId: F.clipA, mediaId: F.mediaId, sourceIn: F.s(0), sourceOut: F.s(5), timelineStart: F.s(0))
+        var history = EditHistory(F.project(clips: [clip]), now: { Date(timeIntervalSince1970: 1_791_000_001.987_654_3) })
+        try history.apply(.moveClip(clipId: F.clipA, timelineStart: F.s(1)))
+        XCTAssertEqual(try ProjectCodec.decode(ProjectCodec.encode(history.present)), history.present)
+    }
+
     func testDahaYeniSemaReddedilir() throws {
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: ProjectCodec.encode(F.project(clips: []))) as? [String: Any])
         json["schemaVersion"] = ProjectDocument.currentSchemaVersion + 1

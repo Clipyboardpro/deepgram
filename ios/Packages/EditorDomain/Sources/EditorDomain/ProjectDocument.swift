@@ -35,8 +35,8 @@ public struct ProjectDocument: Equatable, Sendable, Codable {
         self.tracks = tracks
         self.captionTracks = captionTracks
         self.templateVersion = templateVersion
-        self.createdAt = createdAt
-        self.updatedAt = createdAt
+        self.createdAt = ProjectTimestamp.normalize(createdAt)
+        self.updatedAt = self.createdAt
     }
 
     public func asset(_ mediaId: UUID) -> MediaAsset? {

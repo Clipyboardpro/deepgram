@@ -115,7 +115,7 @@ public struct EditHistory: Sendable {
     public mutating func apply(_ command: EditCommand) throws {
         var next = try present.applying(command)
         next.revision = present.revision + 1
-        next.updatedAt = now()
+        next.updatedAt = ProjectTimestamp.normalize(now())
         undoStack.append(present)
         if undoStack.count > limit { undoStack.removeFirst() }
         redoStack.removeAll()
@@ -128,7 +128,7 @@ public struct EditHistory: Sendable {
         guard var previous = undoStack.popLast() else { return }
         redoStack.append(present)
         previous.revision = present.revision + 1
-        previous.updatedAt = now()
+        previous.updatedAt = ProjectTimestamp.normalize(now())
         present = previous
     }
 
@@ -136,7 +136,7 @@ public struct EditHistory: Sendable {
         guard var next = redoStack.popLast() else { return }
         undoStack.append(present)
         next.revision = present.revision + 1
-        next.updatedAt = now()
+        next.updatedAt = ProjectTimestamp.normalize(now())
         present = next
     }
 }
