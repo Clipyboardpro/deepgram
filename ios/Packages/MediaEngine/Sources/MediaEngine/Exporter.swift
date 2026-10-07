@@ -87,7 +87,11 @@ public struct Exporter: Sendable {
 
     // MARK: - Altyazı katmanı
 
-    /// Her satır için bir metin katmanı; yalnız kendi aralığında görünür.
+    /// Her satır için bir görüntü katmanı; yalnız kendi aralığında görünür.
+    ///
+    /// `CATextLayer` dışa aktarmanın çevrimdışı çiziminde metni çizmiyor (macOS
+    /// CI'da düz renkli katman çıktıya düşerken metin katmanı boş kaldı). Bu yüzden
+    /// metin CoreText ile önceden bit eşleme çizilip katmanın içeriği yapılır.
     static func captionTool(cues: [CaptionCue], renderSize: CGSize, style: CaptionStyle) -> AVVideoCompositionCoreAnimationTool {
         let frame = CGRect(origin: .zero, size: renderSize)
         let parent = CALayer()
@@ -99,25 +103,15 @@ public struct Exporter: Sendable {
         let fontSize = CGFloat(style.fontSize(forCanvasHeight: renderSize.height))
         let maxWidth = CGFloat(style.maxWidth(forCanvasWidth: renderSize.width))
         let bottom = CGFloat(style.bottomMargin(forCanvasHeight: renderSize.height))
-        let font = CTFontCreateWithName("Helvetica-Bold" as CFString, fontSize, nil)
+        let height = fontSize * 2.6   // en fazla iki satır
 
         for cue in cues {
-            let text = CATextLayer()
-            text.string = NSAttributedString(string: cue.text, attributes: [
-                NSAttributedString.Key(kCTFontAttributeName as String): font,
-                NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(gray: 1, alpha: 1),
-            ])
-            text.alignmentMode = .center
-            text.isWrapped = true
-            text.contentsScale = 1
+            let layer = CALayer()
             // Core Animation aracı alt-sol başlangıçlı koordinat kullanır: y alttan ölçülür.
-            let height = fontSize * 2.6   // en fazla iki satır
-            text.frame = CGRect(x: (renderSize.width - maxWidth) / 2, y: bottom, width: maxWidth, height: height)
-            text.shadowColor = CGColor(gray: 0, alpha: 1)
-            text.shadowOpacity = 0.85
-            text.shadowRadius = fontSize * 0.08
-            text.shadowOffset = .zero
-            text.opacity = 0
+            layer.frame = CGRect(x: (renderSize.width - maxWidth) / 2, y: bottom, width: maxWidth, height: height)
+            layer.contents = renderCaption(cue.text, size: layer.frame.size, fontSize: fontSize)
+            layer.contentsGravity = .resize
+            layer.opacity = 0
 
             let show = CABasicAnimation(keyPath: "opacity")
             show.fromValue = 1
@@ -126,12 +120,41 @@ public struct Exporter: Sendable {
             show.duration = cue.range.duration.seconds
             show.isRemovedOnCompletion = true
             show.fillMode = .removed
-            text.add(show, forKey: "görünür")
-            parent.addSublayer(text)
+            layer.add(show, forKey: "görünür")
+            parent.addSublayer(layer)
         }
 
         return AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: video, in: parent)
     }
+}
+
+/// Altyazı satırını şeffaf zeminli bit eşlemeye çizer: beyaz, kalın, ortalı,
+/// gölgeli; metin kutunun üstünden başlar ve gerekirse sarılır.
+func renderCaption(_ text: String, size: CGSize, fontSize: CGFloat) -> CGImage? {
+    let width = Int(size.width.rounded(.up)), height = Int(size.height.rounded(.up))
+    guard width > 0, height > 0,
+          let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return nil }
+
+    var alignment = CTTextAlignment.center
+    let paragraph = withUnsafeBytes(of: &alignment) { bytes in
+        var setting = CTParagraphStyleSetting(spec: .alignment, valueSize: bytes.count, value: bytes.baseAddress!)
+        return CTParagraphStyleCreate(&setting, 1)
+    }
+    let attributes: [NSAttributedString.Key: Any] = [
+        NSAttributedString.Key(kCTFontAttributeName as String): CTFontCreateWithName("Helvetica-Bold" as CFString, fontSize, nil),
+        NSAttributedString.Key(kCTForegroundColorAttributeName as String): CGColor(gray: 1, alpha: 1),
+        NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraph,
+    ]
+    let framesetter = CTFramesetterCreateWithAttributedString(NSAttributedString(string: text, attributes: attributes))
+    let path = CGPath(rect: CGRect(x: 0, y: 0, width: width, height: height), transform: nil)
+    let textFrame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), path, nil)
+
+    context.setShadow(offset: .zero, blur: fontSize * 0.16, color: CGColor(gray: 0, alpha: 0.85))
+    CTFrameDraw(textFrame, context)
+    return context.makeImage()
 }
 
 /// `progress` ve `cancelExport` iş parçacığı güvenlidir; oturumu ilerleme

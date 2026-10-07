@@ -56,6 +56,21 @@ final class ExporterTests: XCTestCase {
         XCTAssertLessThan(after, 40, "altyazıdan sonra bant boş")
     }
 
+    func testAltyaziSatiriBitEslemeyeCizilir() throws {
+        let image = try XCTUnwrap(renderCaption("MERHABA", size: CGSize(width: 900, height: 170), fontSize: 65))
+        XCTAssertEqual(image.width, 900)
+        XCTAssertEqual(image.height, 170)
+        // Gri tonlamaya çizilen beyaz yazı: üst yarıda parlak piksel olmalı, alt kenar boş.
+        var pixels = [UInt8](repeating: 0, count: 900 * 170)
+        let context = try XCTUnwrap(CGContext(data: &pixels, width: 900, height: 170, bitsPerComponent: 8, bytesPerRow: 900,
+                                              space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGImageAlphaInfo.none.rawValue))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: 900, height: 170))
+        let topHalf = pixels[0..<(900 * 85)].max() ?? 0
+        let bottomRows = pixels[(900 * 160)...].max() ?? 0
+        XCTAssertGreaterThan(topHalf, 200, "metin kutunun üstünde çizilir")
+        XCTAssertLessThan(bottomRows, 40, "tek satır alt kenara inmez")
+    }
+
     func testBosProjeDisaAktarilamaz() async {
         do {
             _ = try await Exporter(builder: CompositionBuilder(resolveURL: { _ in URL(fileURLWithPath: "/yok") }))
