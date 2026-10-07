@@ -33,6 +33,10 @@ function validate(value: unknown): CreateJob {
   ) {
     throw new ApiError(400, "invalid_request");
   }
+  // PostgreSQL integer sınırından büyük değer RPC çözümlemesinde 500 olmamalı.
+  if (Number(b.durationSeconds) > 2147483647) {
+    throw new ApiError(413, "audio_too_long");
+  }
   return b as unknown as CreateJob;
 }
 function view(job: JobRow) {

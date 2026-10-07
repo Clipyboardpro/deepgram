@@ -151,6 +151,17 @@ Deno.test("beklenmedik hata ayrıntısı veya anahtar dışarı çıkmaz", async
   assertEquals(Object.keys(value.error).sort(), ["code", "requestId"]);
   assertMatch(value.error.requestId, /^[a-f0-9-]{36}$/);
 });
+Deno.test("PostgreSQL integer sınırını aşan süre güvenli 413 olur", async () => {
+  const { app, calls } = fixture();
+  const r = await app.request("/v1/transcription-jobs", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ ...body, durationSeconds: 2147483648 }),
+  });
+  assertEquals(r.status, 413);
+  assertEquals((await r.json()).error.code, "audio_too_long");
+  assertEquals(calls, []);
+});
 Deno.test("transcript tam result.transcript konumunda ve ses sıfırında döner", async () => {
   const { repo } = fixture();
   const transcript = await new FakeProvider().result("fake:job");
