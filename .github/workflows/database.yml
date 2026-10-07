@@ -1,0 +1,49 @@
+name: Veritabanı doğrulaması
+
+on:
+  push:
+    branches:
+      - codex/cx-001
+  pull_request:
+
+jobs:
+  supabase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Depoyu çek
+        uses: actions/checkout@v4
+
+      - name: Supabase CLI kur
+        uses: supabase/setup-cli@v1
+        with:
+          version: 2.120.0
+
+      - name: Yerel Supabase yığınını başlat
+        run: supabase start --workdir backend
+
+      - name: Veritabanını migration'lardan kur
+        run: supabase db reset --workdir backend
+
+      - name: pgTAP testlerini çalıştır
+        run: supabase test db --workdir backend
+
+      - name: Eşzamanlılık testini çalıştır
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: bash scripts/concurrency-test.sh
+
+      - name: Sürüm ve altyapı kanıtlarını yaz
+        env:
+          PGPASSWORD: postgres
+        run: |
+          supabase --version
+          psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c 'select version();'
+          psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c "select extversion from pg_extension where extname = 'pgmq';"
+          psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c 'select jobname, schedule from cron.job;'
+          psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c 'select * from pgmq.list_queues();'
