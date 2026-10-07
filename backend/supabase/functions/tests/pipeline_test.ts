@@ -26,6 +26,7 @@ function fixture() {
   };
   const calls: string[] = [];
   let pending = true;
+  let receipt: string | null = null;
   const repo: PipelineRepository = {
     dequeue: () =>
       Promise.resolve(
@@ -44,7 +45,28 @@ function fixture() {
     },
     claim: () => {
       calls.push("claim");
+      job.submission_started_at = new Date().toISOString();
       return Promise.resolve({ job_id: id, callback_token: token });
+    },
+    rememberSubmission: (_id, requestId) => {
+      receipt = requestId;
+      calls.push("receipt");
+      return Promise.resolve();
+    },
+    resumeSubmission: () => {
+      if (
+        receipt && ["queued", "unknown_provider_state"].includes(job.status)
+      ) {
+        job.provider_request_id = receipt;
+        job.status = "submitted";
+        calls.push("resume");
+      }
+      return Promise.resolve();
+    },
+    markUnknown: () => {
+      job.status = "unknown_provider_state";
+      calls.push("unknown");
+      return Promise.resolve();
     },
     submitted: (_id, requestId) => {
       job.status = "submitted";
@@ -83,6 +105,7 @@ function fixture() {
     secret,
     publicUrl: "https://project.invalid",
     provider,
+    retryDelayMs: 0,
   });
   return { app, repo, job, calls, provider };
 }
@@ -124,6 +147,7 @@ Deno.test("check -> claim -> submit -> submitted -> webhook -> ack sırası", as
     "check",
     "claim",
     "submit",
+    "receipt",
     "submitted",
     "complete",
     "ack",
@@ -216,5 +240,51 @@ Deno.test("submit sonucu belirsizse kör tekrar/ack yok", async () => {
     headers: await dispatchHeaders(secret),
   });
   assertEquals(await r.json(), { acknowledged: 0, deferred: 1 });
-  assertEquals(calls, ["check", "claim", "submit", "claim"]);
+  assertEquals(calls, ["check", "claim", "submit", "unknown"]);
+});
+
+Deno.test("submit kabulünden sonra ilk mark hatası aynı requestId ile toparlanır", async () => {
+  const { app, repo, job, calls } = fixture();
+  const submitted = repo.submitted;
+  const ids: string[] = [];
+  repo.submitted = (jobId, requestId) => {
+    ids.push(requestId);
+    if (ids.length === 1) throw new Error("temporary DB outage");
+    return submitted(jobId, requestId);
+  };
+  const response = await app.request("/v1/internal/dispatch", {
+    method: "POST",
+    headers: await dispatchHeaders(secret),
+  });
+  assertEquals(await response.json(), { acknowledged: 1, deferred: 0 });
+  assertEquals(ids, ["fake:" + id, "fake:" + id]);
+  assertEquals(job.provider_request_id, "fake:" + id);
+  assertEquals(job.status, "succeeded");
+  assertEquals(calls.filter((call) => call === "submit").length, 1);
+  assertEquals(calls.filter((call) => call === "claim").length, 1);
+});
+
+Deno.test("kalıcı mark hatasında alındı sonraki kirada yeniden submit olmadan kullanılır", async () => {
+  const { app, repo, job, calls } = fixture();
+  let attempts = 0;
+  repo.submitted = () => {
+    attempts++;
+    throw new Error("DB mark unavailable");
+  };
+  // İmzayı her lease için tekrar üret.
+  const first = await app.request("/v1/internal/dispatch", {
+    method: "POST",
+    headers: await dispatchHeaders(secret),
+  });
+  assertEquals(await first.json(), { acknowledged: 0, deferred: 1 });
+  assertEquals(attempts, 3);
+  assertEquals(job.status, "queued");
+  const second = await app.request("/v1/internal/dispatch", {
+    method: "POST",
+    headers: await dispatchHeaders(secret),
+  });
+  assertEquals(await second.json(), { acknowledged: 1, deferred: 0 });
+  assertEquals(job.status, "succeeded");
+  assertEquals(calls.filter((call) => call === "submit").length, 1);
+  assertEquals(calls.includes("resume"), true);
 });

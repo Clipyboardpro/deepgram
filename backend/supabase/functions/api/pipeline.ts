@@ -17,6 +17,7 @@ export interface PipelineOptions {
   publicUrl: string;
   provider?: TranscriptionProvider;
   deliver?: (request: Request) => Promise<Response>;
+  retryDelayMs?: number;
 }
 const terminal = new Set([
   "succeeded",
@@ -28,6 +29,18 @@ export function createPipeline(options: PipelineOptions) {
   const { repo } = options;
   const provider = options.provider ?? new FakeProvider();
   const app = new Hono();
+  async function retry(operation: () => Promise<void>): Promise<void> {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await operation();
+        return;
+      } catch (error) {
+        if (attempt === 2) throw error;
+        const delay = (options.retryDelayMs ?? 150) * (attempt + 1);
+        if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
   app.onError((error, c) => {
     const safe = error instanceof ApiError
       ? error
@@ -65,10 +78,13 @@ export function createPipeline(options: PipelineOptions) {
       }
       if (
         !b || typeof b !== "object" || typeof b.requestId !== "string" ||
-        b.requestId.length > 256 ||
+        b.requestId.length < 1 || b.requestId.length > 256 ||
         typeof b.eventKey !== "string" || b.eventKey.length < 1 ||
         b.eventKey.length > 128 ||
-        b.requestId !== job.provider_request_id
+        (b.requestId !== job.provider_request_id &&
+          !(job.provider_request_id === null &&
+            job.submission_started_at &&
+            ["queued", "unknown_provider_state"].includes(job.status)))
       ) throw new ApiError(400, "invalid_callback");
       if (b.status === "succeeded") {
         if (
@@ -130,6 +146,10 @@ export function createPipeline(options: PipelineOptions) {
     for (const message of await repo.dequeue()) {
       try {
         let job = await repo.get(message.job_id);
+        if (job && ["queued", "unknown_provider_state"].includes(job.status)) {
+          await repo.resumeSubmission(job.id);
+          job = await repo.get(job.id);
+        }
         if (!job || terminal.has(job.status)) {
           await repo.ack(message.msg_id);
           acknowledged++;
@@ -151,8 +171,9 @@ export function createPipeline(options: PipelineOptions) {
           const claim = await repo.claim(job.id);
           if (claim) {
             token = claim.callback_token;
-            // Timeout/istisna dış sağlayıcıya gönderimin belirsiz olabileceği
-            // anlamına gelir: tekrar submit yok; SQL unknown_provider_state yapar.
+            // Yalnız submit hatası belirsizdir; DB mark hatası kabul edilmiş
+            // sağlayıcı isteğini kaybettirmemeli ve ikinci claim yapılmamalı.
+            let requestId: string;
             try {
               const result = await provider.submit({
                 jobId: job.id,
@@ -162,11 +183,18 @@ export function createPipeline(options: PipelineOptions) {
                   options.publicUrl.replace(/\/$/, "")
                 }/functions/v1/api/v1/providers/${job.provider}/callback/${job.id}/${token}`,
               });
-              await repo.submitted(job.id, result.requestId);
+              requestId = result.requestId;
             } catch {
-              await repo.claim(job.id);
+              await repo.markUnknown(job.id);
               throw new ApiError(503, "submission_outcome_unknown");
             }
+            // Alındı belgesi önce provider_events'e gider (anahtar/token değil,
+            // yalnız requestId). Mark kalıcı başarısızsa sonraki kira bunu okur.
+            // DB bütünüyle yoksa bile doğrulanmış callback requestId'yi onarır.
+            try {
+              await retry(() => repo.rememberSubmission(job!.id, requestId));
+            } catch { /* mark veya callback kurtarabilir */ }
+            await retry(() => repo.submitted(job!.id, requestId));
           }
           job = await repo.get(job.id);
         }
