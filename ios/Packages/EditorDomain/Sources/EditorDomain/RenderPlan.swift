@@ -30,6 +30,11 @@ public struct CaptionStyle: Equatable, Sendable, Codable {
 public struct CaptionCue: Equatable, Sendable {
     public var text: String
     public var range: TimeRange
+
+    public init(text: String, range: TimeRange) {
+        self.text = text
+        self.range = range
+    }
 }
 
 /// Projeden çizim planı. Önizleme (SwiftUI katmanı) ve dışa aktarma (videoya
