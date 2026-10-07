@@ -1,0 +1,38 @@
+name: iOS paket testleri
+
+# Sahip: Claude (ios/**). Swift paketleri yalnız Foundation'a bağlı olduğu için
+# Linux'ta test edilir; Xcode/iOS derlemesi Mac gerektirir ve ayrıca eklenecek.
+# contracts/** değişince de çalışır: EditorDomain'deki sözleşme testi sunucu
+# transcript örneğini Swift tarafında doğrular.
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'
+    paths:
+      - 'ios/**'
+      - 'contracts/**'
+      - '.github/workflows/ios.yml'
+  pull_request:
+    paths:
+      - 'ios/**'
+      - 'contracts/**'
+      - '.github/workflows/ios.yml'
+
+jobs:
+  swift-packages:
+    runs-on: ubuntu-24.04
+    container: swift:6.0-noble
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [EditorDomain, AIJobsClient]
+
+    steps:
+      - name: Depoyu çek
+        uses: actions/checkout@v4
+
+      - name: ${{ matrix.package }} testleri
+        working-directory: ios/Packages/${{ matrix.package }}
+        run: swift test
