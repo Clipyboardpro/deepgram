@@ -13,6 +13,11 @@ public enum EditCommand: Equatable, Sendable {
     case splitClip(clipId: UUID, at: MediaTime, newClipId: UUID)
     /// Kelimenin görünen metnini düzeltir; nil düzeltmeyi kaldırır.
     case correctWord(captionTrackId: UUID, wordId: String, text: String?)
+    /// Projeye içe alınmış medyayı kaydeder (dosya zaten proje klasöründe).
+    case addMediaAsset(MediaAsset)
+    /// Aynı medyanın altyazı kanalını ekler ya da yeni AI sonucuyla günceller.
+    /// Mevcut kanal varsa kimliği, stili ve eşleşen kullanıcı düzeltmeleri korunur.
+    case applyTranscript(mediaId: UUID, transcript: Transcript, audioSourceStart: MediaTime)
 }
 
 public enum EditError: Error, Equatable {
@@ -21,6 +26,8 @@ public enum EditError: Error, Equatable {
     case captionTrackNotFound
     case wordNotFound
     case splitOutsideClip
+    case mediaAlreadyExists
+    case mediaNotFound
     case invalidProject([ProjectValidator.Issue])
 }
 
@@ -76,6 +83,18 @@ extension ProjectDocument {
                 doc.captionTracks[i].corrections[wordId] = text
             } else {
                 doc.captionTracks[i].corrections[wordId] = nil
+            }
+
+        case let .addMediaAsset(asset):
+            guard doc.asset(asset.mediaId) == nil else { throw EditError.mediaAlreadyExists }
+            doc.mediaAssets.append(asset)
+
+        case let .applyTranscript(mediaId, transcript, audioSourceStart):
+            guard doc.asset(mediaId) != nil else { throw EditError.mediaNotFound }
+            if let i = doc.captionTracks.firstIndex(where: { $0.mediaId == mediaId }) {
+                doc.captionTracks[i].applyAIResult(transcript, audioSourceStart: audioSourceStart)
+            } else {
+                doc.captionTracks.append(CaptionTrack.make(from: transcript, mediaId: mediaId, audioSourceStart: audioSourceStart))
             }
         }
 

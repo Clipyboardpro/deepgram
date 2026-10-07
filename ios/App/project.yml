@@ -18,6 +18,8 @@ packages:
     path: ../Packages/AIJobsClient
   ProjectLibrary:
     path: ../Packages/ProjectLibrary
+  MediaEngine:
+    path: ../Packages/MediaEngine
 
 targets:
   VideoEditor:
@@ -29,6 +31,7 @@ targets:
       - package: EditorDomain
       - package: AIJobsClient
       - package: ProjectLibrary
+      - package: MediaEngine
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.eyyogang.videoeditor
@@ -43,4 +46,5 @@ targets:
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
+        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: Projeye video eklemek için fotoğraf arşivine erişim gerekir.
         ENABLE_PREVIEWS: YES

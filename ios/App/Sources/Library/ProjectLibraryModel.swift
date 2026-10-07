@@ -51,12 +51,13 @@ final class ProjectLibraryModel {
         }
     }
 
-    func load(_ id: UUID) -> ProjectDocument? {
-        var document: ProjectDocument?
+    /// Düzenleyici için projeyi açar.
+    func makeEditor(_ id: UUID) -> ProjectEditorModel? {
+        var editor: ProjectEditorModel?
         perform("Proje açılamadı.") {
-            document = try repository.load(id)
+            editor = ProjectEditorModel(document: try repository.load(id), repository: repository)
         }
-        return document
+        return editor
     }
 
     private func perform(_ message: String, _ work: () throws -> Void) {

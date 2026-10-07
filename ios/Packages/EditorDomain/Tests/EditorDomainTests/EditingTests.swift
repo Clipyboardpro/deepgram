@@ -89,4 +89,45 @@ final class EditingTests: XCTestCase {
         history.undo()   // sınır 2: üçüncü geri alma etkisiz
         XCTAssertEqual(history.present.tracks[0].clips[0].timelineStart, F.s(1))
     }
+
+    // MARK: - Medya ve AI sonucu
+
+    func testMedyaEklemeGeriAlinabilir() throws {
+        var history = EditHistory(ProjectDocument(createdAt: F.fixedDate))
+        let asset = F.asset()
+        try history.apply(.addMediaAsset(asset))
+        XCTAssertEqual(history.present.mediaAssets, [asset])
+        XCTAssertThrowsError(try history.apply(.addMediaAsset(asset))) {
+            XCTAssertEqual($0 as? EditError, .mediaAlreadyExists)
+        }
+        history.undo()
+        XCTAssertTrue(history.present.mediaAssets.isEmpty)
+    }
+
+    func testAISonucuKanalOlustururSonrakiSonucDuzeltmeyiKorur() throws {
+        let transcript = try Transcript.decode(from: F.transcriptJSON)
+        var history = EditHistory(F.project(clips: [baseClip()]))
+        history = EditHistory({ var d = history.present; d.captionTracks = []; return d }())
+
+        try history.apply(.applyTranscript(mediaId: F.mediaId, transcript: transcript, audioSourceStart: F.s(10)))
+        let track = try XCTUnwrap(history.present.captionTracks.first)
+        XCTAssertEqual(track.words.first?.sourceStart, F.s(10.12))
+
+        try history.apply(.correctWord(captionTrackId: track.captionTrackId, wordId: "w10120", text: "Selam,"))
+        try history.apply(.applyTranscript(mediaId: F.mediaId, transcript: transcript, audioSourceStart: F.s(10)))
+
+        XCTAssertEqual(history.present.captionTracks.count, 1, "aynı medya için ikinci kanal açılmaz")
+        XCTAssertEqual(history.present.captionTracks[0].captionTrackId, track.captionTrackId)
+        XCTAssertEqual(history.present.captionTracks[0].corrections["w10120"], "Selam,")
+
+        history.undo(); history.undo(); history.undo()
+        XCTAssertTrue(history.present.captionTracks.isEmpty, "AI sonucu da geri alınabilir")
+    }
+
+    func testOlmayanMedyayaAltyaziUygulanamaz() throws {
+        let transcript = try Transcript.decode(from: F.transcriptJSON)
+        XCTAssertThrowsError(try ProjectDocument().applying(.applyTranscript(mediaId: UUID(), transcript: transcript, audioSourceStart: .zero))) {
+            XCTAssertEqual($0 as? EditError, .mediaNotFound)
+        }
+    }
 }
