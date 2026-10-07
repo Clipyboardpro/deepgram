@@ -8,7 +8,7 @@ public enum APIErrorCode: Equatable, Sendable {
     case aiJobsDisabled, dailyBudgetExceeded, priceNotConfigured
     case clientRequestIdReused, uploadExpired, jobNotCancelable, jobNotFound, profileNotFound
     case invalidDuration, invalidSeconds, uploadNotFound, uploadMetadataMismatch
-    case storageUnavailable, internalError
+    case storageUnavailable, internalError, freeQuotaNotEligible
     case unknown(String)
 
     private static let table: [String: APIErrorCode] = [
@@ -23,6 +23,7 @@ public enum APIErrorCode: Equatable, Sendable {
         "invalid_duration": .invalidDuration, "invalid_seconds": .invalidSeconds,
         "upload_not_found": .uploadNotFound, "upload_metadata_mismatch": .uploadMetadataMismatch,
         "storage_unavailable": .storageUnavailable, "internal_error": .internalError,
+        "free_quota_not_eligible": .freeQuotaNotEligible,
     ]
 
     public init(rawValue: String) {

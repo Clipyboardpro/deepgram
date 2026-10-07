@@ -28,13 +28,20 @@ public struct AIJobsClient: Sendable {
     public let baseURL: URL
     private let transport: HTTPTransport
     private let accessToken: @Sendable () async throws -> String
+    private let refreshAccessToken: (@Sendable () async throws -> String)?
 
-    /// - Parameter baseURL: Edge Function kökü, ör. `https://<proje>.supabase.co/functions/v1/api`.
-    ///   `/v1/...` yolları bu köke eklenir.
-    public init(baseURL: URL, transport: HTTPTransport = URLSessionTransport(), accessToken: @escaping @Sendable () async throws -> String) {
+    /// - Parameters:
+    ///   - baseURL: Edge Function kökü, ör. `https://<proje>.supabase.co/functions/v1/api`.
+    ///     `/v1/...` yolları bu köke eklenir.
+    ///   - refreshAccessToken: Sunucu 401 döndürürse bir kez çağrılır ve istek yeni
+    ///     anahtarla tekrarlanır (ör. cihaz saati kaymışken süresi dolmuş anahtar).
+    public init(baseURL: URL, transport: HTTPTransport = URLSessionTransport(),
+                accessToken: @escaping @Sendable () async throws -> String,
+                refreshAccessToken: (@Sendable () async throws -> String)? = nil) {
         self.baseURL = baseURL
         self.transport = transport
         self.accessToken = accessToken
+        self.refreshAccessToken = refreshAccessToken
     }
 
     public func createJob(_ request: CreateJobRequest) async throws -> CreateJobResponse {
@@ -55,6 +62,13 @@ public struct AIJobsClient: Sendable {
 
     public func quota() async throws -> Quota {
         try await call("GET", "v1/quota")
+    }
+
+    /// Hesabın ücretsiz kotasını ister. İdempotenttir: hak daha önce verildiyse
+    /// `false` döner. Miktarı sunucu belirler (CX-007).
+    public func claimFreeQuota() async throws -> Bool {
+        struct Response: Decodable { var granted: Bool }
+        return try await (call("POST", "v1/quota/free-claim") as Response).granted
     }
 
     /// Sesi sunucunun verdiği imzalı adrese yükler. İmzalı adres kendi
@@ -90,7 +104,11 @@ public struct AIJobsClient: Sendable {
             request.httpBody = try JSONEncoder().encode(body)
         }
 
-        let (data, response) = try await send(request)
+        var (data, response) = try await send(request)
+        if response.statusCode == 401, let refreshAccessToken {
+            request.setValue("Bearer \(try await refreshAccessToken())", forHTTPHeaderField: "Authorization")
+            (data, response) = try await send(request)
+        }
         guard (200..<300).contains(response.statusCode) else {
             throw Self.error(status: response.statusCode, body: data)
         }

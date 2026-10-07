@@ -11,6 +11,10 @@ final class MockTransport: HTTPTransport, @unchecked Sendable {
         var url: URL
         var headers: [String: String]
         var body: Data?
+        /// HTTP başlık adları büyük-küçük harf duyarsızdır (Linux Foundation adları dönüştürür).
+        func header(_ name: String) -> String? {
+            headers.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
+        }
         var json: [String: Any]? { body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } }
     }
 
