@@ -22,3 +22,6 @@ Thumbs.db
 # Swift Package Manager
 .build/
 .swiftpm/
+
+# XcodeGen çıktısı (ios/App/project.yml kaynaktır)
+ios/App/*.xcodeproj/

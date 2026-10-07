@@ -1,0 +1,46 @@
+# XcodeGen tanımı. .xcodeproj üretilir ve Git'e eklenmez (çakışma olmasın diye):
+#   brew install xcodegen && cd ios/App && xcodegen generate && open VideoEditor.xcodeproj
+#
+# Bundle kimliği, ekip ve uygulama adı henüz kararlaştırılmadı (Drive CODEX-TASKS K3);
+# aşağıdakiler yer tutucudur.
+name: VideoEditor
+
+options:
+  bundleIdPrefix: com.eyyogang
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+packages:
+  EditorDomain:
+    path: ../Packages/EditorDomain
+  AIJobsClient:
+    path: ../Packages/AIJobsClient
+  ProjectLibrary:
+    path: ../Packages/ProjectLibrary
+
+targets:
+  VideoEditor:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    dependencies:
+      - package: EditorDomain
+      - package: AIJobsClient
+      - package: ProjectLibrary
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.eyyogang.videoeditor
+        PRODUCT_NAME: VideoEditor
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Video Editör
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+        INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.photography
+        ENABLE_PREVIEWS: YES
