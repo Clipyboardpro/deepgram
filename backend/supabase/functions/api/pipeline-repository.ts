@@ -190,8 +190,9 @@ export class SupabasePipeline implements PipelineRepository {
     await this.rpc("fail_job", {
       p_job_id: id,
       p_error_code: code,
-      p_event_key: "preflight:" + id,
-      p_kind: "poll",
+      p_event_key: (code === "provider_rejected" ? "rejected:" : "preflight:") +
+        id,
+      p_kind: code === "provider_rejected" ? "submit" : "poll",
     });
   }
 }

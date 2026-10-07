@@ -22,6 +22,11 @@ export interface Submission {
 export interface ProviderSubmission {
   requestId: string;
 }
+export class ProviderRejected extends Error {
+  constructor() {
+    super("provider_rejected");
+  }
+}
 export interface ProviderCallback {
   requestId: string;
   eventKey: string;
