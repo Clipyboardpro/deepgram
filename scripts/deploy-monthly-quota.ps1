@@ -44,19 +44,19 @@ try {
   if (-not $passwordLine) { throw 'Local Git-ignored DB password required' }
   $env:SUPABASE_DB_PASSWORD = ($passwordLine.Split('=',2)[1]).Trim().Trim('"').Trim("'")
   $passwordLine=$null
-  Invoke-SafeSupabase @('db','push','--dry-run','--workdir','backend','--skip-vault')
-  Invoke-SafeSupabase @('db','push','--workdir','backend','--skip-vault','--yes')
+  Invoke-SafeSupabase -CliArgs @('db','push','--dry-run','--workdir','backend','--skip-vault')
+  Invoke-SafeSupabase -CliArgs @('db','push','--workdir','backend','--skip-vault','--yes')
   Write-Output 'Reviewed CX-007/008 migrations applied.'
   $randomBytes = New-Object byte[] 32
   [Security.Cryptography.RandomNumberGenerator]::Fill($randomBytes)
   $pepper = [Convert]::ToHexString($randomBytes).ToLowerInvariant()
   [Array]::Clear($randomBytes,0,$randomBytes.Length)
-  Invoke-SafeSupabase @('secrets','set','--project-ref',$ref,'FREE_QUOTA_SECONDS=900',('FREE_QUOTA_PEPPER='+$pepper))
+  Invoke-SafeSupabase -CliArgs @('secrets','set','--project-ref',$ref,'FREE_QUOTA_SECONDS=900',('FREE_QUOTA_PEPPER='+$pepper))
   $pepper=$null
   Write-Output 'Monthly amount and fresh 64-character pepper installed; value not saved/logged.'
   # Sağlayıcı güvenlik sınırı; mevcut dispatcher/Vault/Deepgram anahtarına dokunmaz.
-  Invoke-SafeSupabase @('secrets','set','--project-ref',$ref,'TRANSCRIPTION_PROVIDER=fake','TRANSCRIPTION_MODEL=fake-v1')
-  Invoke-SafeSupabase @('functions','deploy','api','--workdir','backend','--project-ref',$ref,'--no-verify-jwt','--use-api')
+  Invoke-SafeSupabase -CliArgs @('secrets','set','--project-ref',$ref,'TRANSCRIPTION_PROVIDER=fake','TRANSCRIPTION_MODEL=fake-v1')
+  Invoke-SafeSupabase -CliArgs @('functions','deploy','api','--workdir','backend','--project-ref',$ref,'--no-verify-jwt','--use-api')
   Write-Output 'Reviewed API deployed with fake provider. Auth unchanged; run approved live smoke next.'
 } finally {
   $pepper=$null
