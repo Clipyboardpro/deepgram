@@ -38,6 +38,21 @@ jobs:
         working-directory: ios/Packages/${{ matrix.package }}
         run: swift test
 
+  media-engine:
+    # AVFoundation yalnız Apple platformlarında: testler macOS'ta, test medyası
+    # test içinde üretilir.
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Depoyu çek
+        uses: actions/checkout@v4
+
+      - name: MediaEngine testleri
+        working-directory: ios/Packages/MediaEngine
+        run: swift test
+
   ios-app:
     if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: macos-15
