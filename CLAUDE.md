@@ -15,6 +15,17 @@
 5. Drive aynası yerelden tek yönlü güncellenir; kullanıcı açıkça istemedikçe
    aynadaki dosyaları değiştirme.
 
+## Sonra: proje devir belgeleri (Claude–Codex)
+
+- Drive klasörü **"Video Editör · Proje"**
+  (https://drive.google.com/drive/folders/1IIOF3hE3CAFANzLG3plXmO2jCb8FUsZ_).
+- Önce `HANDOFF.md`'yi oku; durum koduna göre çalış (`CODEX_BEKLEMEDE` ise
+  yerel değişikliği yapılmış varsayma). Diğerleri: PROJECT-BRIEF, ARCHITECTURE,
+  DECISIONS, CODEX-TASKS, CLAUDE-NEXT, RESEARCH.
+- Rol: Claude mimar/inceleyici/görev paketi yazar; Codex yerel repoda uygular;
+  kararı Eymen verir. Codex'e model/düşünme seviyesi dayatma.
+- Oturum sonunda HANDOFF veya CLAUDE-NEXT'i tarih ve güncelleyen tarafla güncel bırak.
+
 ## Proje
 
 - Kullanıcıyla her zaman Türkçe konuş; her adım bitince kısa durum bildir.
