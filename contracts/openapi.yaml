@@ -1,0 +1,959 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Video Editör API",
+    "version": "1.0.0",
+    "description": "IS-BOLUMU §3 Transcript v1. Kaynak medya başlangıcı istemcide tutulur; provider/model sunucu ortamından seçilir.",
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:54321/functions/v1/api",
+      "description": "/v1 yolları bu köke eklenir.",
+    },
+  ],
+  "security": [
+    {
+      "bearerAuth": [],
+    },
+  ],
+  "paths": {
+    "/v1/transcription-jobs": {
+      "post": {
+        "operationId": "createTranscriptionJob",
+        "summary": "İş oluştur ve imzalı yükleme adresi al",
+        "description": "Yeni ve tekrarlanan istekler 200 döner. Sağlayıcı çağrılmaz. uploaded sonrası iş queued kalır. JSON en fazla 8192 bayt.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJob",
+              },
+            },
+          },
+        },
+        "responses": {
+          "200": {
+            "description": "Aynı isteğin tekrarı aynı işi döndürür.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateJobResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "401": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "402": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "404": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "409": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "413": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "415": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "429": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "500": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "503": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/transcription-jobs/{id}/uploaded": {
+      "post": {
+        "operationId": "markJobUploaded",
+        "summary": "Yüklemeyi doğrula ve işi kuyruğa al",
+        "description": "Storage nesnesi, boyutu ve MIME türü doğrulanır. Tekrar kuyruk mesajı üretmez. Ses özeti ve süre ölçümü dispatcher aşamasındadır.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "description": "Güncel iş.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "401": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "402": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "404": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "409": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "413": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "415": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "429": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "500": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "503": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/transcription-jobs/{id}/cancel": {
+      "post": {
+        "operationId": "cancelJob",
+        "summary": "Gönderim başlamadan işi iptal et",
+        "description": "Kota rezervasyonu bırakılır. Tekrarlanan iptal aynı işi döndürür.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "description": "Güncel iş.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobResponse",
+                },
+              },
+            },
+          },
+          "400": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "401": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "402": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "404": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "409": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "413": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "415": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "429": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "500": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "503": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/jobs/{id}": {
+      "get": {
+        "operationId": "getJob",
+        "summary": "Kendi işini ve varsa sonucunu oku",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+            },
+          },
+        ],
+        "responses": {
+          "200": {
+            "description": "Sonuç zamanları yüklenen sesin başına göredir.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobWithResult",
+                },
+              },
+            },
+          },
+          "400": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "401": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "402": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "404": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "409": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "413": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "415": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "429": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "500": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "503": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/quota": {
+      "get": {
+        "operationId": "getQuota",
+        "summary": "Aktif kota dönemlerini oku",
+        "responses": {
+          "200": {
+            "description": "En erken biten dönem önce; rezervasyon dönemlere bölünmez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Quota",
+                },
+              },
+            },
+          },
+          "400": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "401": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "402": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "404": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "409": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "413": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "415": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "429": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "500": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "503": {
+            "description": "Sabit hata kodu; iç SQL ayrıntısı içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+      },
+    },
+    "schemas": {
+      "CreateJob": {
+        "type": "object",
+        "required": [
+          "clientRequestId",
+          "language",
+          "audioSha256",
+          "audioBytes",
+          "durationSeconds",
+        ],
+        "properties": {
+          "clientRequestId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 128,
+            "description": "Kullanıcı başına idempotency anahtarı; aynı ses özetiyle tekrar aynı işi döndürür.",
+          },
+          "language": {
+            "type": "string",
+            "pattern": "^[a-z]{2}(-[A-Z]{2})?$",
+          },
+          "audioSha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+          },
+          "audioBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+          },
+          "durationSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991,
+            "description": "Yukarı yuvarlanmış süre. Varsayılan sınırlar 300 saniye ve 15 MiB; aşılırsa 413.",
+          },
+        },
+        "additionalProperties": false,
+      },
+      "Job": {
+        "type": "object",
+        "required": [
+          "id",
+          "status",
+          "createdAt",
+          "errorCode",
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "awaiting_upload",
+              "queued",
+              "submitted",
+              "processing",
+              "succeeded",
+              "failed",
+              "canceled",
+              "unknown_provider_state",
+            ],
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+          },
+          "errorCode": {
+            "oneOf": [
+              {
+                "type": "string",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+        },
+      },
+      "Upload": {
+        "type": "object",
+        "required": [
+          "url",
+          "method",
+          "headers",
+          "expiresAt",
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+          },
+          "method": {
+            "const": "PUT",
+          },
+          "headers": {
+            "type": "object",
+            "required": [
+              "Content-Type",
+            ],
+            "properties": {
+              "Content-Type": {
+                "const": "audio/mp4",
+              },
+            },
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "İşin yüklemeyi kabul ettiği son zaman. Storage imzası iki saat geçerli olabilir; uploaded bu tarihten sonra reddedilir.",
+          },
+        },
+      },
+      "CreateJobResponse": {
+        "type": "object",
+        "required": [
+          "job",
+          "upload",
+        ],
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/Job",
+          },
+          "upload": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Upload",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
+        },
+      },
+      "JobResponse": {
+        "type": "object",
+        "required": [
+          "job",
+        ],
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/Job",
+          },
+        },
+      },
+      "JobWithResult": {
+        "type": "object",
+        "required": [
+          "job",
+          "result",
+        ],
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/Job",
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": [
+                  "transcript",
+                  "expiresAt",
+                ],
+                "properties": {
+                  "transcript": {
+                    "$ref": "./transcript.schema.json",
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "format": "date-time",
+                  },
+                },
+              },
+              {
+                "type": "null",
+              },
+            ],
+            "description": "Hazır değilse veya sonuç saklama süresi dolduysa null.",
+          },
+        },
+      },
+      "Quota": {
+        "type": "object",
+        "required": [
+          "periods",
+        ],
+        "properties": {
+          "periods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "source",
+                "startsAt",
+                "endsAt",
+                "grantedSeconds",
+                "usedSeconds",
+                "reservedSeconds",
+                "availableSeconds",
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                },
+                "source": {
+                  "type": "string",
+                  "enum": [
+                    "free",
+                    "subscription",
+                    "topup",
+                    "manual",
+                  ],
+                },
+                "startsAt": {
+                  "type": "string",
+                  "format": "date-time",
+                },
+                "endsAt": {
+                  "type": "string",
+                  "format": "date-time",
+                },
+                "grantedSeconds": {
+                  "type": "integer",
+                },
+                "usedSeconds": {
+                  "type": "integer",
+                },
+                "reservedSeconds": {
+                  "type": "integer",
+                },
+                "availableSeconds": {
+                  "type": "integer",
+                },
+              },
+            },
+          },
+        },
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "error",
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "requestId",
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "not_authenticated",
+                  "invalid_request",
+                  "unsupported_media_type",
+                  "request_too_large",
+                  "not_found",
+                  "insufficient_quota",
+                  "rate_limited",
+                  "audio_too_long",
+                  "audio_too_large",
+                  "ai_jobs_disabled",
+                  "daily_budget_exceeded",
+                  "price_not_configured",
+                  "client_request_id_reused",
+                  "upload_expired",
+                  "job_not_cancelable",
+                  "job_not_found",
+                  "profile_not_found",
+                  "invalid_duration",
+                  "invalid_seconds",
+                  "upload_not_found",
+                  "upload_metadata_mismatch",
+                  "storage_unavailable",
+                  "internal_error",
+                ],
+              },
+              "requestId": {
+                "type": "string",
+                "format": "uuid",
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+}

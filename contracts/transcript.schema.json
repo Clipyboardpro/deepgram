@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://video-editor.local/contracts/transcript.schema.json",
+  "title": "Transcript v1",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "provider",
+    "model",
+    "language",
+    "durationSeconds",
+    "words"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "language": {
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+    },
+    "durationSeconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "words": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "text",
+          "start",
+          "end"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "display": {
+            "type": "string"
+          },
+          "start": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Yüklenen ses dosyasının başına göre saniye."
+          },
+          "end": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Yüklenen ses dosyasının başına göre saniye; start değerinden küçük olamaz."
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    }
+  }
+}

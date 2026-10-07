@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "provider": "deepgram",
+  "model": "nova-3",
+  "language": "tr",
+  "durationSeconds": 61.42,
+  "words": [
+    {
+      "text": "merhaba",
+      "display": "Merhaba,",
+      "start": 0.12,
+      "end": 0.48,
+      "confidence": 0.98
+    }
+  ]
+}
