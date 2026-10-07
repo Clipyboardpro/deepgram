@@ -27,7 +27,8 @@ const terminal = new Set([
 ]);
 export function createPipeline(options: PipelineOptions) {
   const { repo } = options;
-  const provider = options.provider ?? new FakeProvider();
+  const provider: TranscriptionProvider = options.provider ??
+    new FakeProvider();
   const app = new Hono();
   async function retry(operation: () => Promise<void>): Promise<void> {
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -72,7 +73,10 @@ export function createPipeline(options: PipelineOptions) {
       ) throw new ApiError(415, "unsupported_media_type");
       let b: Callback;
       try {
-        b = await c.req.json();
+        const raw = await c.req.json();
+        b = provider.parseCallback
+          ? provider.parseCallback(raw, job.language)
+          : raw;
       } catch {
         throw new ApiError(400, "invalid_callback");
       }
@@ -199,6 +203,13 @@ export function createPipeline(options: PipelineOptions) {
           job = await repo.get(job.id);
         }
         if (job?.status === "submitted") {
+          if (provider.name !== "fake") {
+            // Gerçek sağlayıcı kendi HTTP callback'ini gönderir. İş submitted
+            // olarak kalır; kuyruk ack'i sağlayıcıya tekrar göndermek değildir.
+            await repo.ack(message.msg_id);
+            acknowledged++;
+            continue;
+          }
           token ??= await repo.recover(job.id);
           if (!token) {
             deferred++;

@@ -3,6 +3,8 @@ import { createPipeline } from "../api/pipeline.ts";
 import { AudioError } from "../_shared/audio.ts";
 import { dispatchHeaders, verifyDispatch } from "../_shared/dispatch-auth.ts";
 import { FakeProvider } from "../_shared/provider.ts";
+import type { TranscriptionProvider } from "../_shared/provider.ts";
+import { DeepgramProvider } from "../_shared/deepgram.ts";
 import type {
   DispatchJob,
   PipelineRepository,
@@ -10,14 +12,14 @@ import type {
 const secret = "test-only-not-a-real-secret-000000000000";
 const id = "00000000-0000-4000-8000-000000000001";
 const token = "a".repeat(64);
-function fixture() {
+function fixture(suppliedProvider?: TranscriptionProvider) {
   const job: DispatchJob = {
     id,
     status: "queued",
     storage_path: "private",
     language: "tr",
-    provider: "fake",
-    model: "fake-v1",
+    provider: suppliedProvider?.name ?? "fake",
+    model: suppliedProvider?.model ?? "fake-v1",
     audio_bytes: 100,
     audio_sha256: "b".repeat(64),
     claimed_duration_seconds: 1,
@@ -94,7 +96,8 @@ function fixture() {
       return Promise.resolve();
     },
   };
-  const provider = new FakeProvider();
+  const provider: TranscriptionProvider = suppliedProvider ??
+    new FakeProvider();
   const submit = provider.submit.bind(provider);
   provider.submit = (input) => {
     calls.push("submit");
@@ -287,4 +290,61 @@ Deno.test("kalıcı mark hatasında alındı sonraki kirada yeniden submit olmad
   assertEquals(job.status, "succeeded");
   assertEquals(calls.filter((call) => call === "submit").length, 1);
   assertEquals(calls.includes("resume"), true);
+});
+
+Deno.test("Deepgram async dispatch ack sonrası yalnız gerçek callback tamamlar; yanlış ID reddedilir", async () => {
+  const requestId = "11111111-1111-4111-8111-111111111111";
+  const http: typeof fetch = () =>
+    Promise.resolve(new Response(JSON.stringify({ request_id: requestId })));
+  const { app, job, calls } = fixture(new DeepgramProvider("mock-only", http));
+  const dispatch = await app.request("/v1/internal/dispatch", {
+    method: "POST",
+    headers: await dispatchHeaders(secret),
+  });
+  assertEquals(await dispatch.json(), { acknowledged: 1, deferred: 0 });
+  assertEquals(job.status, "submitted");
+  assertEquals(calls.includes("complete"), false);
+  const raw = {
+    metadata: { request_id: requestId, channels: 1, duration: 1 },
+    results: {
+      channels: [{
+        alternatives: [{
+          words: [{
+            word: "merhaba",
+            punctuated_word: "Merhaba!",
+            start: 0.12,
+            end: 0.48,
+            confidence: 0.98,
+          }],
+        }],
+      }],
+    },
+  };
+  const path = `/v1/providers/deepgram/callback/${id}/${token}`;
+  for (
+    const [supplied, expected] of [
+      ["22222222-2222-4222-8222-222222222222", 400],
+      [requestId, 200],
+      [requestId, 200],
+    ] as const
+  ) {
+    raw.metadata.request_id = supplied;
+    const response = await app.request(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(raw),
+    });
+    assertEquals(response.status, expected);
+    await response.json();
+  }
+  assertEquals(job.status, "succeeded");
+  assertEquals(calls.filter((call) => call === "complete").length, 1);
+  assertEquals(calls.filter((call) => call === "submit").length, 1);
+  const oversized = await app.request(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ padding: "x".repeat(1024 * 1024) }),
+  });
+  assertEquals(oversized.status, 413);
+  await oversized.json();
 });

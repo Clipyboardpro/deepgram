@@ -22,11 +22,19 @@ export interface Submission {
 export interface ProviderSubmission {
   requestId: string;
 }
+export interface ProviderCallback {
+  requestId: string;
+  eventKey: string;
+  status: "succeeded" | "failed";
+  transcript?: Transcript;
+  errorCode?: string;
+}
 export interface TranscriptionProvider {
   readonly name: string;
   readonly model: string;
   submit(input: Submission): Promise<ProviderSubmission>;
   result(requestId: string): Promise<Transcript>;
+  parseCallback?(body: unknown, language: string): ProviderCallback;
 }
 
 /** Ağ çağrısı yapmaz. Dispatcher bu sonucu CX-003'te teslim eder. */
