@@ -46,7 +46,7 @@ private struct EditorContent: View {
                     .padding(.horizontal)
                 TransportBar(editor: editor)
                 TimelineStrip(editor: editor)
-                CaptionButton(editor: editor)
+                CaptionBar(editor: editor)
             }
             Spacer(minLength: 0)
         }
@@ -135,28 +135,41 @@ private struct EditorContent: View {
     }
 }
 
-/// Altyazısı olmayan videolar için sunucuda otomatik altyazı başlatır.
-/// Oturum yoksa önce giriş ekranı açılır.
-private struct CaptionButton: View {
+/// Otomatik altyazı (altyazısı olmayan videolar için sunucuda; oturum yoksa
+/// önce giriş) ve altyazı listesi.
+private struct CaptionBar: View {
     let editor: ProjectEditorModel
     @Environment(AccountModel.self) private var account
+    @State private var showsList = false
 
     var body: some View {
         let hasTargets = !editor.captionTargets.isEmpty
-        Button {
-            guard let api = account.api else { return }
-            if account.isSignedIn {
-                editor.startCaptioning(api: api)
-            } else {
-                editor.needsSignIn = true
+        HStack(spacing: 12) {
+            Button {
+                guard let api = account.api else { return }
+                if account.isSignedIn {
+                    editor.startCaptioning(api: api)
+                } else {
+                    editor.needsSignIn = true
+                }
+            } label: {
+                Label(hasTargets ? "Otomatik altyazı" : "Altyazılar hazır", systemImage: "captions.bubble")
+                    .frame(maxWidth: .infinity)
             }
-        } label: {
-            Label(hasTargets ? "Otomatik altyazı" : "Altyazılar hazır", systemImage: "captions.bubble")
-                .frame(maxWidth: .infinity)
+            .buttonStyle(.borderedProminent)
+            .disabled(!hasTargets || account.state == .unavailable || editor.captionState != .idle)
+
+            Button { showsList = true } label: {
+                Label("Altyazıları düzenle", systemImage: "list.bullet.rectangle")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.bordered)
+            .disabled(editor.document.captionTracks.isEmpty)
         }
-        .buttonStyle(.borderedProminent)
-        .disabled(!hasTargets || account.state == .unavailable || editor.captionState != .idle)
         .padding(.horizontal)
+        .sheet(isPresented: $showsList) {
+            CaptionListView(editor: editor)
+        }
     }
 }
 

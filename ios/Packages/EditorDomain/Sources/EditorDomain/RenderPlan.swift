@@ -47,6 +47,7 @@ public enum RenderPlan {
         var cues = document.captionTracks
             .flatMap { builder.lines(from: document.timelineWords(for: $0)) }
             .map { CaptionCue(text: $0.text, range: $0.range) }
+            .filter { !$0.text.isEmpty }   // tümü gizlenmiş satır gösterilmez
             .sorted { $0.range.start < $1.range.start }
 
         for i in cues.indices.dropLast() where cues[i].range.end > cues[i + 1].range.start {

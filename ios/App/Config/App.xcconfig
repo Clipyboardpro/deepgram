@@ -2,10 +2,10 @@
 // yalnız Supabase proje kimliği yazılır; adres kodda kurulur.
 SUPABASE_PROJECT_REF = yjtpfyowzyszeoitlubx
 
-// Herkese açık (publishable/anon) anahtar. Tasarım gereği gizli değildir (RLS
-// korur) ama repoya eklenip eklenmeyeceği Eymen kararı; şimdilik yerel
-// Secrets.xcconfig dosyasından okunur (bkz. Secrets.example.xcconfig).
-// service_role / secret anahtar ASLA buraya ya da uygulamaya konmaz.
-SUPABASE_PUBLISHABLE_KEY =
+// Herkese açık (publishable) anahtar: tasarım gereği gizli değildir, her
+// istemcide bulunur; veriyi RLS ve sunucu kuralları korur (Eymen kararı:
+// repoda tutulur). service_role / secret anahtar ASLA buraya konmaz.
+SUPABASE_PUBLISHABLE_KEY = sb_publishable_B2AXPPyUf2nCJLsk21VEDw_gOVIEn7k
 
+// İsteğe bağlı yerel geçersiz kılma (ör. yerel Supabase); Git'e eklenmez.
 #include? "Secrets.xcconfig"
