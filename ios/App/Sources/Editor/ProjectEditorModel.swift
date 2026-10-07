@@ -126,6 +126,30 @@ final class ProjectEditorModel {
         exportState = .idle
     }
 
+    // MARK: - Altyazı düzenleme
+
+    /// Düzenleme listesi (önizleme ve dışa aktarmayla aynı satırlar).
+    var captionLines: [EditableCaptionLine] { RenderPlan.editableLines(for: document) }
+
+    /// Satırın metnini kullanıcının yazdığıyla değiştirir (tek geri al adımı).
+    func editCaption(_ line: EditableCaptionLine, newText: String) {
+        applyCorrections(CaptionLineEditor.corrections(for: line, newText: newText), in: line)
+    }
+
+    /// Satırdaki düzeltmeleri kaldırır, AI metnine döner.
+    func revertCaption(_ line: EditableCaptionLine) {
+        applyCorrections(CaptionLineEditor.revert(line), in: line)
+    }
+
+    private func applyCorrections(_ corrections: [WordCorrection], in line: EditableCaptionLine) {
+        guard !corrections.isEmpty else { return }
+        do {
+            try apply(.correctWords(captionTrackId: line.captionTrackId, corrections: corrections))
+        } catch {
+            errorMessage = "Altyazı değiştirilemedi."
+        }
+    }
+
     // MARK: - Otomatik altyazı
 
     enum CaptionState: Equatable {
