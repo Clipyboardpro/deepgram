@@ -52,10 +52,11 @@ public struct Exporter: Sendable {
         session.audioMix = built.audioMix
         session.shouldOptimizeForNetworkUse = true
 
+        let handle = SessionHandle(session)
         let watcher = progress.map { report in
             Task {
                 while !Task.isCancelled {
-                    report(Double(session.progress))
+                    report(Double(handle.session.progress))
                     try? await Task.sleep(nanoseconds: 200_000_000)
                 }
             }
@@ -65,7 +66,7 @@ public struct Exporter: Sendable {
         await withTaskCancellationHandler {
             await session.export()
         } onCancel: {
-            session.cancelExport()
+            handle.session.cancelExport()
         }
 
         switch session.status {
@@ -131,4 +132,11 @@ public struct Exporter: Sendable {
 
         return AVVideoCompositionCoreAnimationTool(postProcessingAsVideoLayer: video, in: parent)
     }
+}
+
+/// `progress` ve `cancelExport` iş parçacığı güvenlidir; oturumu ilerleme
+/// görevine ve iptal kapanışına taşımak için sarmalayıcı.
+private final class SessionHandle: @unchecked Sendable {
+    let session: AVAssetExportSession
+    init(_ session: AVAssetExportSession) { self.session = session }
 }
