@@ -17,257 +17,342 @@
     },
   ],
   "paths": {
-      "/v1/internal/dispatch": {
-        "post": {
-          "operationId": "dispatchTranscriptions",
-          "summary": "Sunucu içi kuyruk tüketimi",
-          "description": "Vault/pg_net HMAC. İmza dispatch:<epoch-saniye> mesajının SHA-256 HMAC hex değeridir. Zaman farkı en fazla 60 saniye. Ham secret başlığa yazılmaz. Tekrarlanan tetik DB claim/idempotency ile güvenlidir. Kullanıcı JWT bu ucu açmaz.",
-          "security": [
-            {
-              "dispatcherSignature": [],
-              "dispatcherTimestamp": []
-            }
-          ],
-          "responses": {
-            "200": {
-              "description": "Bir batch (5 mesaj); deferred mesajlar kira dolunca görünür.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "type": "object",
-                    "required": [
-                      "acknowledged",
-                      "deferred"
-                    ],
-                    "properties": {
-                      "acknowledged": {
-                        "type": "integer",
-                        "minimum": 0
-                      },
-                      "deferred": {
-                        "type": "integer",
-                        "minimum": 0
-                      }
-                    }
-                  }
-                }
-              }
-            },
-            "401": {
-              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Error"
-                  }
-                }
-              }
-            },
-            "500": {
-              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Error"
-                  }
-                }
-              }
-            }
-          }
-        }
-      },
-      "/v1/providers/{provider}/callback/{id}/{token}": {
-        "post": {
-          "operationId": "providerCallback",
-          "summary": "İşe bağlı sağlayıcı callback",
-          "description": "JWT gerektirmez. İşe bağlı token ve provider requestId doğrulanır. Token URL bir sırdır; loglanmaz. Aynı callback ikinci kota kaydı oluşturmaz. Transcript v1 ve ses başlangıcı değişmez. CX-003 yalnız fake adaptörüdür.",
-          "security": [],
-          "parameters": [
-            {
-              "name": "provider",
-              "in": "path",
-              "required": true,
-              "schema": {
-                "type": "string",
-                "enum": [
-                  "fake"
-                ]
-              }
-            },
-            {
-              "name": "id",
-              "in": "path",
-              "required": true,
-              "schema": {
-                "type": "string",
-                "format": "uuid"
-              }
-            },
-            {
-              "name": "token",
-              "in": "path",
-              "required": true,
-              "schema": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              }
-            }
-          ],
-          "requestBody": {
-            "required": true,
+    "/v1/internal/dispatch": {
+      "post": {
+        "operationId": "dispatchTranscriptions",
+        "summary": "Sunucu içi kuyruk tüketimi",
+        "description": "Vault/pg_net HMAC. İmza dispatch:<epoch-saniye> mesajının SHA-256 HMAC hex değeridir. Zaman farkı en fazla 60 saniye. Ham secret başlığa yazılmaz. Tekrarlanan tetik DB claim/idempotency ile güvenlidir. Kullanıcı JWT bu ucu açmaz.",
+        "security": [
+          {
+            "dispatcherSignature": [],
+            "dispatcherTimestamp": [],
+          },
+        ],
+        "responses": {
+          "200": {
+            "description": "Bir batch (5 mesaj); deferred mesajlar kira dolunca görünür.",
             "content": {
               "application/json": {
                 "schema": {
-                  "oneOf": [
-                    {
-                      "type": "object",
-                      "required": [
-                        "requestId",
-                        "eventKey",
-                        "status",
-                        "transcript"
-                      ],
-                      "properties": {
-                        "requestId": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 256
-                        },
-                        "eventKey": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 128
-                        },
-                        "status": {
-                          "type": "string",
-                          "const": "succeeded"
-                        },
-                        "transcript": {
-                          "$ref": "./transcript.schema.json"
-                        }
-                      }
+                  "type": "object",
+                  "required": [
+                    "acknowledged",
+                    "deferred",
+                  ],
+                  "properties": {
+                    "acknowledged": {
+                      "type": "integer",
+                      "minimum": 0,
                     },
-                    {
-                      "type": "object",
-                      "required": [
-                        "requestId",
-                        "eventKey",
-                        "status",
-                        "errorCode"
-                      ],
-                      "properties": {
-                        "requestId": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 256
-                        },
-                        "eventKey": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 128
-                        },
-                        "status": {
-                          "type": "string",
-                          "const": "failed"
-                        },
-                        "errorCode": {
-                          "type": "string",
-                          "enum": [
-                            "provider_failed",
-                            "invalid_audio",
-                            "provider_timeout"
-                          ]
-                        }
-                      }
-                    }
-                  ]
-                }
-              }
-            }
+                    "deferred": {
+                      "type": "integer",
+                      "minimum": 0,
+                    },
+                  },
+                },
+              },
+            },
           },
-          "responses": {
-            "200": {
-              "description": "Kabul edildi; tekrarlar da 200.",
-              "content": {
-                "application/json": {
-                  "schema": {
+          "401": {
+            "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "500": {
+            "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/v1/providers/{provider}/callback/{id}/{token}": {
+      "post": {
+        "operationId": "providerCallback",
+        "summary": "İşe bağlı sağlayıcı callback",
+        "description": "JWT gerektirmez. İşe bağlı token ve provider requestId doğrulanır. Token URL bir sırdır; loglanmaz. Aynı callback ikinci kota kaydı oluşturmaz. Transcript v1 ve ses başlangıcı değişmez. Fake normalize edilmiş gövde, Deepgram native metadata/results veya err_code gövdesi gönderir. En fazla 1 MiB; yalnız sunucuda etkin sağlayıcı kabul edilir.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "fake",
+                "deepgram",
+              ],
+            },
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+            },
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$",
+            },
+          },
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
                     "type": "object",
                     "required": [
-                      "accepted"
+                      "requestId",
+                      "eventKey",
+                      "status",
+                      "transcript",
                     ],
                     "properties": {
-                      "accepted": {
-                        "type": "boolean",
-                        "const": true
-                      }
-                    }
-                  }
-                }
-              }
+                      "requestId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256,
+                      },
+                      "eventKey": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                      },
+                      "status": {
+                        "type": "string",
+                        "const": "succeeded",
+                      },
+                      "transcript": {
+                        "$ref": "./transcript.schema.json",
+                      },
+                    },
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "requestId",
+                      "eventKey",
+                      "status",
+                      "errorCode",
+                    ],
+                    "properties": {
+                      "requestId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256,
+                      },
+                      "eventKey": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                      },
+                      "status": {
+                        "type": "string",
+                        "const": "failed",
+                      },
+                      "errorCode": {
+                        "type": "string",
+                        "enum": [
+                          "provider_failed",
+                          "invalid_audio",
+                          "provider_timeout",
+                        ],
+                      },
+                    },
+                  },
+                  {
+                    "type": "object",
+                    "description": "Deepgram native success callback; runtime tek kanal, UUID request_id ve Transcript v1 zaman/güven sınırlarını doğrular.",
+                    "required": ["metadata", "results"],
+                    "properties": {
+                      "metadata": {
+                        "type": "object",
+                        "required": ["request_id", "duration", "channels"],
+                        "properties": {
+                          "request_id": { "type": "string", "format": "uuid" },
+                          "duration": {
+                            "type": "number",
+                            "exclusiveMinimum": 0,
+                            "maximum": 300,
+                          },
+                          "channels": { "type": "integer", "const": 1 },
+                        },
+                      },
+                      "results": {
+                        "type": "object",
+                        "required": ["channels"],
+                        "properties": {
+                          "channels": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 1,
+                            "items": {
+                              "type": "object",
+                              "required": ["alternatives"],
+                              "properties": {
+                                "alternatives": {
+                                  "type": "array",
+                                  "minItems": 1,
+                                  "items": {
+                                    "type": "object",
+                                    "required": ["words"],
+                                    "properties": {
+                                      "words": {
+                                        "type": "array",
+                                        "maxItems": 10000,
+                                        "items": {
+                                          "type": "object",
+                                          "required": ["word", "start", "end"],
+                                          "properties": {
+                                            "word": { "type": "string" },
+                                            "punctuated_word": {
+                                              "type": "string",
+                                            },
+                                            "start": {
+                                              "type": "number",
+                                              "minimum": 0,
+                                            },
+                                            "end": {
+                                              "type": "number",
+                                              "minimum": 0,
+                                            },
+                                            "confidence": {
+                                              "type": "number",
+                                              "minimum": 0,
+                                              "maximum": 1,
+                                            },
+                                          },
+                                        },
+                                      },
+                                    },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                  {
+                    "type": "object",
+                    "description": "Deepgram native failure; özel hata metni saklanmaz/döndürülmez.",
+                    "required": ["request_id", "err_code"],
+                      "not": { "required": ["results"], "properties": { "results": {} } },
+                    "properties": {
+                      "request_id": { "type": "string", "format": "uuid" },
+                      "err_code": { "type": "string" },
+                    },
+                  },
+                ],
+              },
             },
-            "400": {
-              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Error"
-                  }
-                }
-              }
+          },
+        },
+        "responses": {
+          "200": {
+            "description": "Kabul edildi; tekrarlar da 200.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "accepted",
+                  ],
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean",
+                      "const": true,
+                    },
+                  },
+                },
+              },
             },
-            "404": {
-              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Error"
-                  }
-                }
-              }
+          },
+          "400": {
+            "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
             },
-            "409": {
-              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Error"
-                  }
-                }
-              }
+          },
+          "404": {
+            "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
             },
-            "413": {
-              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Error"
-                  }
-                }
-              }
+          },
+          "409": {
+            "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
             },
-            "415": {
-              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Error"
-                  }
-                }
-              }
+          },
+          "413": {
+            "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
             },
-            "500": {
-              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
-              "content": {
-                "application/json": {
-                  "schema": {
-                    "$ref": "#/components/schemas/Error"
-                  }
-                }
-              }
-            }
-          }
-        }
+          },
+          "415": {
+            "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+          "500": {
+            "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
       },
+    },
     "/v1/transcription-jobs": {
       "post": {
         "operationId": "createTranscriptionJob",
@@ -907,8 +992,16 @@
   },
   "components": {
     "securitySchemes": {
-      "dispatcherSignature": { "type": "apiKey", "in": "header", "name": "X-Dispatcher-Signature" },
-      "dispatcherTimestamp": { "type": "apiKey", "in": "header", "name": "X-Dispatcher-Timestamp" },
+      "dispatcherSignature": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Dispatcher-Signature",
+      },
+      "dispatcherTimestamp": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Dispatcher-Timestamp",
+      },
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",

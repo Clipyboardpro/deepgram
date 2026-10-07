@@ -67,8 +67,8 @@ Geçici DB/Storage/callback hatasında ack yoktur; kira bitince tekrar görünü
 Gönderim sonucu belirsizse kör submit tekrarı yoktur: DB
 `unknown_provider_state` yapar. Operatör uzlaştırması gerekir. Fake iş submitted
 ile callback arasındayken kesilirse yeni tokenla sonucu yeniden teslim eder;
-provider.submit tekrarlanmaz. Yalnız `fake/fake-v1` adaptörü kayıtlıdır;
-Deepgram CX-004'tür.
+provider.submit tekrarlanmaz. `fake/fake-v1` ve `deepgram/nova-3` kayıtlıdır;
+canlı sağlayıcı değiştirmek ayrıca maliyet onayı gerektirir.
 
 FakeProvider'ın ağsız sonucu aynı callback yönlendiricisinden işlem içi teslim
 edilir; dış sağlayıcı callback HTTP ucu da aynıdır. Token yalnız URL'de geçici
@@ -82,7 +82,37 @@ Süre beyanını/service limitini en fazla 250 ms encoder payı aşabilir; boyut
 sınırı `64000 × ölçülen_saniye + 65536` byte'dır. Kota ölçülen sürenin yukarı
 yuvarlanmasıyla, ayrılan kota sınırında kesinleşir. Bu bir codec decoder
 değildir; saldırganca hazırlanmış sample metadata'yı tam decode ederek kanıtlama
-ve gerçek sağlayıcı süre uzlaştırması CX-004'te ayrıca ele alınmalı.
+tam decode kanıtı henüz yoktur. Deepgram callback süresi preflight ile en fazla
+250 ms farklı olabilir; daha büyük fark sonuç mutasyonu yapmadan reddedilir.
+
+## CX-004 · Deepgram adaptörü (ücretli test/aktivasyon kapalı)
+
+`TRANSCRIPTION_PROVIDER=deepgram`, `TRANSCRIPTION_MODEL=nova-3` ve
+`DEEPGRAM_API_KEY` yalnız açık maliyet onayı sonrası Edge secrets ile ayarlanır.
+Şu an canlı konfigürasyon fake/fake-v1'dir; bu değişiklik dağıtılmadı.
+Deepgram'a tek POST: EU `/v1/listen`, language=tr, punctuate=true,
+smart_format=true, signed READ URL + callback. İstek/timeout otomatik yeniden
+gönderilmez; belirsiz sonuç operatör uzlaştırmasına gider. Submitted işi ack
+etmek sonuç oluşturmaz; gerçek callback beklenir. Callback token + requestId
+kontrolü, native words → Transcript v1; display=punctuated_word. Kaynak video
+ofseti eklenmez. Başarısız callback'in özel hata metni saklanmaz.
+
+1 MiB callback sınırı korunur; tek kanal, en fazla 300 sn / 10000 kelime.
+2000 kelimelik sentetik 5 dk gövde testi bu sınıra sığar; gerçek Türkçe ölçümü
+değildir. Fazla büyük callback 413, bozuk veri 400; kota kesinleştirilmez.
+Gerçek WER/zamanlama/latans ve ücretli canlı iş yapılmadı: kullanıcı yalnız
+adaptörü istedi. Eyyoverse örnekleri bu repo klasöründe bulunmadı.
+
+2026-10-07 kaynak kontrolü: Nova-3 tr/tr-TR destekler. Pay-as-you-go
+pre-recorded monolingual liste fiyatı $0.0043/dk (4300 USD micros/dk),
+multilingual $0.0052/dk; language=tr tek dil seçilir. Hesap indirimleri veya
+model improvement opt-out gibi fiyat etkileri ayrıca doğrulanmalıdır. Bu fiyat
+canlı DB'ye eklenmedi; onay sonrası idempotent yönetim adımı gerekir.
+
+[Deepgram model/diller](https://developers.deepgram.com/docs/models-languages-overview),
+[Pre-recorded API](https://developers.deepgram.com/reference/speech-to-text/listen-pre-recorded),
+[AB uç noktası](https://developers.deepgram.com/reference/regional-endpoints),
+[Liste fiyatı](https://deepgram.com/pricing).
 
 `bash scripts/api-smoke.sh` hem CX-002 hem CX-003'ü gerçek yerel yığında test
 eder. Test rastgele geçici sır üretir, Vault/pg_net zincirini tetikler ve

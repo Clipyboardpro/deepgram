@@ -2,6 +2,7 @@ import { createApp } from "./app.ts";
 import { repositoryFromEnvironment } from "./repository.ts";
 import { createClient } from "@supabase/supabase-js";
 import { SupabasePipeline } from "./pipeline-repository.ts";
+import { providerFromEnvironment } from "../_shared/deepgram.ts";
 
 // Supabase giriş yolu /functions/v1/api/v1/...; sözleşmedeki mantıksal kök /v1.
 const secret = Deno.env.get("DISPATCHER_SECRET");
@@ -13,6 +14,7 @@ const app = createApp(
   secret
     ? {
       secret,
+      provider: providerFromEnvironment(),
       publicUrl: Deno.env.get("PUBLIC_SUPABASE_URL")!,
       repo: new SupabasePipeline(
         createClient(
