@@ -62,6 +62,23 @@ struct TransportBar: View {
             }
             .disabled(editor.clipUnderPlayhead() == nil)
 
+            Menu {
+                ForEach(ProjectEditorModel.speedOptions, id: \.self) { rate in
+                    Button {
+                        editor.setSpeed(rate)
+                    } label: {
+                        if editor.selectedClip?.playbackRate == rate {
+                            Label(SpeedText.format(rate), systemImage: "checkmark")
+                        } else {
+                            Text(SpeedText.format(rate))
+                        }
+                    }
+                }
+            } label: {
+                Label("Hız", systemImage: "gauge.with.dots.needle.67percent")
+            }
+            .disabled(editor.selectedClip == nil)
+
             Button(role: .destructive) { editor.deleteSelectedClip() } label: {
                 Label("Sil", systemImage: "trash")
             }
@@ -72,10 +89,13 @@ struct TransportBar: View {
     }
 }
 
-/// Klipler sürelerine orantılı bloklar; dokununca seçilir, sürükleyince imleç gezer.
+/// Klipler sürelerine orantılı bloklar; dokununca seçilir, sürükleyince imleç
+/// gezer. Seçili klibin kenarlarındaki tutamaçlar sürüklenerek kırpılır.
 struct TimelineStrip: View {
     let editor: ProjectEditorModel
     private let pointsPerSecond: CGFloat = 40
+    /// Sürüklenen kenar ve zaman çizelgesindeki miktarı (sn).
+    @State private var trim: (edge: ClipEdge, seconds: Double)?
 
     var body: some View {
         let document = editor.document
@@ -85,22 +105,7 @@ struct TimelineStrip: View {
         ScrollView(.horizontal, showsIndicators: false) {
             ZStack(alignment: .leading) {
                 ForEach(clips, id: \.clipId) { clip in
-                    let selected = clip.clipId == editor.selectedClipId
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(selected ? Color.accentColor : Color.accentColor.opacity(0.45))
-                        .overlay(alignment: .leading) {
-                            if clip.playbackRate != 1 {
-                                Text("\(clip.playbackRate, format: .number)x")
-                                    .font(.caption2.bold())
-                                    .foregroundStyle(.white)
-                                    .padding(.leading, 6)
-                            }
-                        }
-                        .frame(width: max(CGFloat(clip.timelineDuration.seconds) * pointsPerSecond - 2, 4), height: 56)
-                        .offset(x: CGFloat(clip.timelineStart.seconds) * pointsPerSecond)
-                        .onTapGesture {
-                            editor.selectedClipId = selected ? nil : clip.clipId
-                        }
+                    clipBlock(clip, selected: clip.clipId == editor.selectedClipId)
                 }
                 Rectangle()
                     .fill(.white)
@@ -114,9 +119,71 @@ struct TimelineStrip: View {
                 let seconds = max(0, min(Double(value.location.x / pointsPerSecond), document.duration.seconds))
                 editor.playback.seek(to: MediaTime(seconds: seconds))
             })
-            .padding(.horizontal)
+            .padding(.horizontal, 24)
         }
         .frame(height: 80)
         .background(Color(.secondarySystemBackground))
+    }
+
+    @ViewBuilder
+    private func clipBlock(_ clip: Clip, selected: Bool) -> some View {
+        // Sürüklenirken seçili klip yeni uzunluğuyla gösterilir (bırakınca uygulanır).
+        let duration: Double = {
+            guard selected, let trim else { return clip.timelineDuration.seconds }
+            let range = editor.trimPreview(clip, edge: trim.edge, timelineSeconds: trim.seconds)
+            return (range.sourceOut - range.sourceIn).seconds / clip.playbackRate
+        }()
+        let width = max(CGFloat(duration) * pointsPerSecond - 2, 4)
+
+        RoundedRectangle(cornerRadius: 6)
+            .fill(selected ? Color.accentColor : Color.accentColor.opacity(0.45))
+            .overlay(alignment: .leading) {
+                if clip.playbackRate != 1 {
+                    Text(SpeedText.format(clip.playbackRate))
+                        .font(.caption2.bold())
+                        .foregroundStyle(.white)
+                        .padding(.leading, 18)
+                }
+            }
+            .overlay {
+                if selected {
+                    HStack {
+                        handle(clip, edge: .start)
+                        Spacer(minLength: 0)
+                        handle(clip, edge: .end)
+                    }
+                }
+            }
+            .frame(width: width, height: 56)
+            .offset(x: CGFloat(clip.timelineStart.seconds) * pointsPerSecond)
+            .onTapGesture {
+                editor.selectedClipId = selected ? nil : clip.clipId
+            }
+    }
+
+    private func handle(_ clip: Clip, edge: ClipEdge) -> some View {
+        RoundedRectangle(cornerRadius: 3)
+            .fill(.white)
+            .frame(width: 14, height: 56)
+            .overlay(Capsule().fill(Color.accentColor).frame(width: 3, height: 20))
+            .contentShape(Rectangle().inset(by: -8))
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 2)
+                    .onChanged { value in
+                        trim = (edge, Double(value.translation.width / pointsPerSecond))
+                    }
+                    .onEnded { value in
+                        trim = nil
+                        editor.commitTrim(clip, edge: edge, timelineSeconds: Double(value.translation.width / pointsPerSecond))
+                    }
+            )
+            .accessibilityLabel(edge == .start ? "Başlangıcı kırp" : "Sonu kırp")
+    }
+}
+
+enum SpeedText {
+    /// 0.5 → "0.5x", 2 → "2x"
+    static func format(_ rate: Double) -> String {
+        rate == rate.rounded() ? "\(Int(rate))x" : "\(rate.formatted(.number.precision(.fractionLength(0...2))))x"
     }
 }

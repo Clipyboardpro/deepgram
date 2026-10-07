@@ -61,6 +61,42 @@ final class ProjectEditorModel {
         }
     }
 
+    // MARK: - Kırpma ve hız
+
+    static let speedOptions: [Double] = [0.25, 0.5, 1, 1.5, 2, 3, 4]
+
+    var selectedClip: Clip? {
+        guard let id = selectedClipId else { return nil }
+        return document.tracks.flatMap(\.clips).first { $0.clipId == id }
+    }
+
+    /// Seçili klibin kenarının sürüklemeyle varacağı kaynak aralığı (önizleme için).
+    func trimPreview(_ clip: Clip, edge: ClipEdge, timelineSeconds: Double) -> (sourceIn: MediaTime, sourceOut: MediaTime) {
+        let assetDuration = document.asset(clip.mediaId)?.duration ?? clip.sourceOut
+        return clip.trimming(edge, byTimeline: MediaTime(seconds: timelineSeconds), assetDuration: assetDuration)
+    }
+
+    /// Kenar sürüklemesini uygular; sonraki klipler kayar (tek geri al adımı).
+    func commitTrim(_ clip: Clip, edge: ClipEdge, timelineSeconds: Double) {
+        let range = trimPreview(clip, edge: edge, timelineSeconds: timelineSeconds)
+        guard range.sourceIn != clip.sourceIn || range.sourceOut != clip.sourceOut else { return }
+        do {
+            try apply(.rippleEdit(clipId: clip.clipId, sourceIn: range.sourceIn, sourceOut: range.sourceOut, rate: clip.playbackRate))
+        } catch {
+            errorMessage = "Klip kırpılamadı."
+        }
+    }
+
+    /// Seçili klibin hızını değiştirir; sonraki klipler kayar.
+    func setSpeed(_ rate: Double) {
+        guard let clip = selectedClip, clip.playbackRate != rate else { return }
+        do {
+            try apply(.rippleEdit(clipId: clip.clipId, sourceIn: clip.sourceIn, sourceOut: clip.sourceOut, rate: rate))
+        } catch {
+            errorMessage = "Hız değiştirilemedi."
+        }
+    }
+
     /// İmlecin üzerindeki klip (seçili değilse).
     func clipUnderPlayhead() -> UUID? {
         let clips = document.tracks.first { $0.kind == .video }?.clips ?? []
