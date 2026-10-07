@@ -8,6 +8,10 @@ public enum EditCommand: Equatable, Sendable {
     case trimClip(clipId: UUID, sourceIn: MediaTime, sourceOut: MediaTime)
     case moveClip(clipId: UUID, timelineStart: MediaTime)
     case setRate(clipId: UUID, rate: Double)
+    /// Klibin kaynak aralığını ve hızını birlikte değiştirir; aynı kanalda
+    /// sonra gelen klipler, klibin bitişi ne kadar kaydıysa o kadar kayar
+    /// (boşluk ya da çakışma oluşmaz). Kırpma ve hız arayüzü bunu kullanır.
+    case rippleEdit(clipId: UUID, sourceIn: MediaTime, sourceOut: MediaTime, rate: Double)
     /// Klibi zaman çizelgesindeki bir anda ikiye böler. İkinci parça
     /// `newClipId` kimliğini alır.
     case splitClip(clipId: UUID, at: MediaTime, newClipId: UUID)
@@ -72,6 +76,19 @@ extension ProjectDocument {
         case let .setRate(clipId, rate):
             let (t, c) = try doc.requireClip(clipId)
             doc.tracks[t].clips[c].playbackRate = rate
+
+        case let .rippleEdit(clipId, sourceIn, sourceOut, rate):
+            let (t, c) = try doc.requireClip(clipId)
+            let old = doc.tracks[t].clips[c]
+            var edited = old
+            edited.sourceIn = sourceIn
+            edited.sourceOut = sourceOut
+            edited.playbackRate = rate
+            let shift = edited.timelineRange.end - old.timelineRange.end
+            doc.tracks[t].clips[c] = edited
+            for i in doc.tracks[t].clips.indices where i != c && doc.tracks[t].clips[i].timelineStart >= old.timelineRange.end {
+                doc.tracks[t].clips[i].timelineStart = doc.tracks[t].clips[i].timelineStart + shift
+            }
 
         case let .splitClip(clipId, at, newClipId):
             let (t, c) = try doc.requireClip(clipId)
@@ -182,5 +199,29 @@ public struct EditHistory: Sendable {
         next.revision = present.revision + 1
         next.updatedAt = ProjectTimestamp.normalize(now())
         present = next
+    }
+}
+
+/// Klibin kırpılan kenarı.
+public enum ClipEdge: Sendable {
+    case start, end
+}
+
+extension Clip {
+    /// Zaman çizelgesinde kenarın `delta` kadar çekilmesinin kaynak aralığına
+    /// karşılığı (hız hesaba katılır). Kaynak sınırları ve en kısa süre aşılmaz.
+    /// - Parameter delta: Sağa çekme pozitif, sola negatif (zaman çizelgesi süresi).
+    public func trimming(_ edge: ClipEdge, byTimeline delta: MediaTime, assetDuration: MediaTime,
+                         minimumTimeline: MediaTime = MediaTime(seconds: 0.1)) -> (sourceIn: MediaTime, sourceOut: MediaTime) {
+        let sourceDelta = delta.divided(by: 1 / playbackRate)
+        let minimumSource = minimumTimeline.divided(by: 1 / playbackRate)
+        switch edge {
+        case .start:
+            let latest = sourceOut - minimumSource
+            return (min(max(sourceIn + sourceDelta, .zero), max(latest, .zero)), sourceOut)
+        case .end:
+            let earliest = sourceIn + minimumSource
+            return (sourceIn, max(min(sourceOut + sourceDelta, assetDuration), min(earliest, assetDuration)))
+        }
     }
 }
