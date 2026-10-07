@@ -14,6 +14,7 @@ export interface DispatchJob {
   claimed_duration_seconds: number;
   inspected_duration_seconds: number | null;
   provider_request_id: string | null;
+  submission_started_at?: string | null;
 }
 export interface Claim {
   job_id: string;
@@ -33,6 +34,9 @@ export interface PipelineRepository {
   preflight(job: DispatchJob): Promise<void>;
   claim(id: string): Promise<Claim | null>;
   submitted(id: string, requestId: string): Promise<void>;
+  rememberSubmission(id: string, requestId: string): Promise<void>;
+  resumeSubmission(id: string): Promise<void>;
+  markUnknown(id: string): Promise<void>;
   recover(id: string): Promise<string | null>;
   signedAudio(job: DispatchJob): Promise<string>;
   verify(
@@ -69,7 +73,7 @@ export class SupabasePipeline implements PipelineRepository {
   }
   async get(id: string): Promise<DispatchJob | null> {
     const { data, error } = await this.admin.from("jobs").select(
-      "id,status,storage_path,language,provider,model,audio_bytes,audio_sha256,claimed_duration_seconds,inspected_duration_seconds,provider_request_id",
+      "id,status,storage_path,language,provider,model,audio_bytes,audio_sha256,claimed_duration_seconds,inspected_duration_seconds,provider_request_id,submission_started_at",
     ).eq("id", id).maybeSingle();
     if (error) throw databaseError(error);
     return data as DispatchJob | null;
@@ -133,6 +137,18 @@ export class SupabasePipeline implements PipelineRepository {
     );
     return rows[0]?.callback_token ?? null;
   }
+  async rememberSubmission(id: string, requestId: string): Promise<void> {
+    await this.rpc("remember_provider_submission", {
+      p_job_id: id,
+      p_request_id: requestId,
+    });
+  }
+  async resumeSubmission(id: string): Promise<void> {
+    await this.rpc("resume_provider_submission", { p_job_id: id });
+  }
+  async markUnknown(id: string): Promise<void> {
+    await this.rpc("mark_submission_unknown", { p_job_id: id });
+  }
   async signedAudio(job: DispatchJob): Promise<string> {
     const { data, error } = await this.admin.storage.from("transcription-audio")
       .createSignedUrl(job.storage_path, 120);
@@ -159,7 +175,7 @@ export class SupabasePipeline implements PipelineRepository {
     token: string,
     body: Callback,
   ): Promise<void> {
-    await this.rpc("apply_provider_callback", {
+    await this.rpc("receive_provider_callback", {
       p_provider: provider,
       p_job_id: id,
       p_token: token,

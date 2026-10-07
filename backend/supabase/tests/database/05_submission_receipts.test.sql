@@ -1,0 +1,35 @@
+begin;
+select plan(12);
+select ok(not has_function_privilege('authenticated','public.remember_provider_submission(uuid,text)','execute'),'istemci kabul alındısı yazamaz');
+select ok(not has_function_privilege('anon','public.receive_provider_callback(text,uuid,text,text,text,text,jsonb,text)','execute'),'anon callback RPC çağıramaz');
+insert into auth.users(id) values ('00000000-0000-0000-0000-0000000000f1');
+insert into public.provider_prices(provider,model,price_version,usd_micros_per_minute,valid_from)
+values ('fake','fake-v1','receipt-test',0,now() - interval '1 minute');
+select public.grant_quota('00000000-0000-0000-0000-0000000000f1',60,now()-interval '1 minute',now()+interval '1 day','manual','receipt-test');
+create temp table r(id uuid, token text);
+insert into r(id) select (public.create_transcription_job('00000000-0000-0000-0000-0000000000f1','receipt-0001','tr',repeat('a',64),1000,1,'fake','fake-v1')).id;
+select public.mark_job_uploaded('00000000-0000-0000-0000-0000000000f1',(select id from r));
+select public.record_job_audio_check((select id from r),1);
+update r set token = (select callback_token from public.claim_job_for_submission(r.id));
+select public.remember_provider_submission((select id from r),'fake:accepted');
+select public.remember_provider_submission((select id from r),'fake:accepted');
+select is((select count(*)::int from public.provider_events where job_id=(select id from r) and outcome='accepted_pending_mark'),1,'kabul alındısı idempotent');
+select throws_ok(format('select public.remember_provider_submission(%L,%L)',(select id from r),'other'),'P0001','provider_request_id_mismatch','ikinci requestId kabul edilmez');
+select public.mark_submission_unknown((select id from r));
+select is((select status::text from public.jobs where id=(select id from r)),'unknown_provider_state','belirsiz gönderim ayrı durumda');
+select public.resume_provider_submission((select id from r));
+select is((select status::text from public.jobs where id=(select id from r)),'submitted','alındıdan toparlama');
+select is((select provider_request_id from public.jobs where id=(select id from r)),'fake:accepted','kabul edilen requestId korunur');
+select is((public.receive_provider_callback('fake',(select id from r),(select token from r),'fake:accepted','result:accepted','succeeded','{"durationSeconds":1}')).status::text,'succeeded','toparlama sonrası callback kabul edilir');
+-- Submit cevabı ve bütün DB yazmaları kesilmiş: tokenlı callback atomik onarır.
+truncate r;
+insert into r(id) select (public.create_transcription_job('00000000-0000-0000-0000-0000000000f1','receipt-0002','tr',repeat('b',64),1000,1,'fake','fake-v1')).id;
+select public.mark_job_uploaded('00000000-0000-0000-0000-0000000000f1',(select id from r));
+select public.record_job_audio_check((select id from r),1);
+update r set token = (select callback_token from public.claim_job_for_submission(r.id));
+select throws_ok(format($q$select public.receive_provider_callback('fake',%L,%L,'fake:early','early','succeeded','{"durationSeconds":1}')$q$,(select id from r),repeat('0',64)),'P0002','job_not_found','yanlış token toparlama yapamaz');
+select is((select provider_request_id from public.jobs where id=(select id from r)),null::text,'yanlış token DB durumunu değiştirmez');
+select is((public.receive_provider_callback('fake',(select id from r),(select token from r),'fake:early','early','succeeded','{"durationSeconds":1}')).status::text,'succeeded','mark öncesi callback atomik toparlar');
+select is((select count(*)::int from public.usage_ledger where job_id=(select id from r)),1,'callback toparlaması tek kota kaydı');
+select * from finish();
+rollback;

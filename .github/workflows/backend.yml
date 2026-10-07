@@ -8,6 +8,16 @@ on:
   pull_request:
 
 jobs:
+  standalone-postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Düz PostgreSQL test bağımlılıkları
+        run: sudo apt-get update && sudo apt-get install -y postgresql-16 postgresql-16-pgtap postgresql-16-cron
+      - name: Docker'sız yapısal shim ve eşzamanlılık testi
+        run: sudo env PG_BIN=/usr/lib/postgresql/16/bin bash scripts/db-test.sh
+
   supabase:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

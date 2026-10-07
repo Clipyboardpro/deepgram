@@ -67,7 +67,9 @@ echo "== Supabase taklit katmanı"
 echo "== Migration'lar"
 for f in "$MIGRATIONS"/*.sql; do
   echo "   $(basename "$f")"
-  "${PSQL[@]}" -f "$f" >/dev/null
+  # Düz PostgreSQL'de yalnız net/Vault yapısal shim'i kullanılır. Dosyanın
+  # kendisi değişmez; gerçek Supabase CI bu filtreyi kullanmaz.
+  awk '!/^create extension if not exists (pg_net|supabase_vault)([ ;]|$)/' "$f" | "${PSQL[@]}" >/dev/null
 done
 
 echo "== pgTAP testleri"
@@ -75,6 +77,6 @@ echo "== pgTAP testleri"
 PGOPTIONS="-c search_path=public,extensions" pg_prove --ext .sql -r "$TESTS"
 
 echo "== Eşzamanlılık testi"
-"$ROOT/scripts/concurrency-test.sh"
+bash "$ROOT/scripts/concurrency-test.sh"
 
 echo "Tüm veritabanı testleri geçti."

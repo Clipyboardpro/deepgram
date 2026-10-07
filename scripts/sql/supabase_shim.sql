@@ -47,3 +47,18 @@ create table storage.buckets (
 alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
 alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+
+-- pg_net/Vault yalnız yapısal taklit: ağ ve gerçek şifreleme YOKTUR.
+-- db-test.sh yalnız bu iki extension CREATE satırını atlar; gerçek Supabase
+-- CI tüm migration'ları değiştirmeden uygular. Bu dosya canlıya uygulanmaz.
+create schema net;
+create schema vault;
+create table vault.secrets (id uuid primary key default gen_random_uuid(), name text unique, secret text not null);
+create view vault.decrypted_secrets as select id, name, secret as decrypted_secret from vault.secrets;
+create function vault.create_secret(new_secret text, new_name text default null, new_description text default '')
+returns uuid language sql as $$
+  insert into vault.secrets(secret,name) values(new_secret,new_name) returning id;
+$$;
+create function net.http_post(url text, body jsonb default '{}'::jsonb, params jsonb default '{}'::jsonb,
+  headers jsonb default '{}'::jsonb, timeout_milliseconds integer default 1000)
+returns bigint language sql as $$select null::bigint;$$;
