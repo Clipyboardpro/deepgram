@@ -22,9 +22,16 @@
 - Önce `HANDOFF.md`'yi oku; durum koduna göre çalış (`CODEX_BEKLEMEDE` ise
   yerel değişikliği yapılmış varsayma). Diğerleri: PROJECT-BRIEF, ARCHITECTURE,
   DECISIONS, CODEX-TASKS, CLAUDE-NEXT, RESEARCH.
-- Rol: Claude mimar/inceleyici/görev paketi yazar; Codex yerel repoda uygular;
-  kararı Eymen verir. Codex'e model/düşünme seviyesi dayatma.
-- Oturum sonunda HANDOFF veya CLAUDE-NEXT'i tarih ve güncelleyen tarafla güncel bırak.
+- İş bölümü (Eymen, 2026-10-07; ayrıntı Drive `IS-BOLUMU.md`): Claude ve Codex
+  paralel kod yazar. **Claude yalnız `ios/**`, `docs/ios-*.md`, `CLAUDE.md`**;
+  Codex `backend/**`, `contracts/**`, `scripts/**`, `docs/KARARLAR.md`.
+  Diğer tarafın alanına dokunma; istek varsa kendi devir belgene yaz.
+- Ortak sözleşme: Transcript JSON v1 (IS-BOLUMU §3).
+- Devir belgeleri: `HANDOFF.md` yalnız Codex yazar; Claude kendi durumunu
+  `HANDOFF-CLAUDE.md`'ye yazar. Kararı Eymen verir; Codex'e model dayatma.
+- Oturum sonunda HANDOFF-CLAUDE veya CLAUDE-NEXT'i tarih ve güncelleyen tarafla güncel bırak.
+- Swift testleri (Linux, Docker): `dockerd` çalışmıyorsa başlat, sonra
+  `cd ios/Packages/EditorDomain && docker run --rm -v "$PWD":/pkg -w /pkg swift:6.0-noble swift test`.
 
 ## Proje
 
