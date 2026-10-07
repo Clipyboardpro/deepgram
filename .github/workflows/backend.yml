@@ -38,7 +38,7 @@ jobs:
 
       - name: API tip ve birim testleri
         run: |
-          deno check --config backend/supabase/functions/deno.json backend/supabase/functions/api/index.ts scripts/api-smoke.ts scripts/dispatcher-smoke.ts
+          deno check --config backend/supabase/functions/deno.json backend/supabase/functions/api/index.ts scripts/api-smoke.ts scripts/dispatcher-smoke.ts scripts/live-smoke.ts scripts/prepare-edge-env.ts
           deno test --allow-read --config backend/supabase/functions/deno.json backend/supabase/functions/tests/
 
       - name: OpenAPI doğrula
