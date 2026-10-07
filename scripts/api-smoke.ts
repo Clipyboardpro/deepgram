@@ -170,6 +170,14 @@ try {
   });
   await put.text();
   assert(put.ok, `Signed upload HTTP ${put.status}`);
+  const afterUploadRetry = await api(
+    "/v1/transcription-jobs",
+    owner.token,
+    "POST",
+    input,
+  );
+  assertEquals(afterUploadRetry.job.id, id);
+  assertEquals(afterUploadRetry.upload, null);
   assertEquals(
     (await api(`/v1/transcription-jobs/${id}/uploaded`, owner.token, "POST"))
       .job.status,

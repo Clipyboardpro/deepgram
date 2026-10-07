@@ -17,6 +17,257 @@
     },
   ],
   "paths": {
+      "/v1/internal/dispatch": {
+        "post": {
+          "operationId": "dispatchTranscriptions",
+          "summary": "Sunucu içi kuyruk tüketimi",
+          "description": "Vault/pg_net HMAC. İmza dispatch:<epoch-saniye> mesajının SHA-256 HMAC hex değeridir. Zaman farkı en fazla 60 saniye. Ham secret başlığa yazılmaz. Tekrarlanan tetik DB claim/idempotency ile güvenlidir. Kullanıcı JWT bu ucu açmaz.",
+          "security": [
+            {
+              "dispatcherSignature": [],
+              "dispatcherTimestamp": []
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Bir batch (5 mesaj); deferred mesajlar kira dolunca görünür.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "required": [
+                      "acknowledged",
+                      "deferred"
+                    ],
+                    "properties": {
+                      "acknowledged": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "deferred": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "500": {
+              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/v1/providers/{provider}/callback/{id}/{token}": {
+        "post": {
+          "operationId": "providerCallback",
+          "summary": "İşe bağlı sağlayıcı callback",
+          "description": "JWT gerektirmez. İşe bağlı token ve provider requestId doğrulanır. Token URL bir sırdır; loglanmaz. Aynı callback ikinci kota kaydı oluşturmaz. Transcript v1 ve ses başlangıcı değişmez. CX-003 yalnız fake adaptörüdür.",
+          "security": [],
+          "parameters": [
+            {
+              "name": "provider",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "enum": [
+                  "fake"
+                ]
+              }
+            },
+            {
+              "name": "id",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            {
+              "name": "token",
+              "in": "path",
+              "required": true,
+              "schema": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "requestId",
+                        "eventKey",
+                        "status",
+                        "transcript"
+                      ],
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "eventKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "status": {
+                          "type": "string",
+                          "const": "succeeded"
+                        },
+                        "transcript": {
+                          "$ref": "./transcript.schema.json"
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "requestId",
+                        "eventKey",
+                        "status",
+                        "errorCode"
+                      ],
+                      "properties": {
+                        "requestId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 256
+                        },
+                        "eventKey": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "status": {
+                          "type": "string",
+                          "const": "failed"
+                        },
+                        "errorCode": {
+                          "type": "string",
+                          "enum": [
+                            "provider_failed",
+                            "invalid_audio",
+                            "provider_timeout"
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Kabul edildi; tekrarlar da 200.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "required": [
+                      "accepted"
+                    ],
+                    "properties": {
+                      "accepted": {
+                        "type": "boolean",
+                        "const": true
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "409": {
+              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "413": {
+              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "415": {
+              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            },
+            "500": {
+              "description": "Sabit hata kodu; iç ayrıntı/sır içermez.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/Error"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
     "/v1/transcription-jobs": {
       "post": {
         "operationId": "createTranscriptionJob",
@@ -656,6 +907,8 @@
   },
   "components": {
     "securitySchemes": {
+      "dispatcherSignature": { "type": "apiKey", "in": "header", "name": "X-Dispatcher-Signature" },
+      "dispatcherTimestamp": { "type": "apiKey", "in": "header", "name": "X-Dispatcher-Timestamp" },
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
@@ -940,6 +1193,9 @@
                   "profile_not_found",
                   "invalid_duration",
                   "invalid_seconds",
+                  "invalid_callback",
+                  "invalid_job_state",
+                  "audio_duration_mismatch",
                   "upload_not_found",
                   "upload_metadata_mismatch",
                   "storage_unavailable",

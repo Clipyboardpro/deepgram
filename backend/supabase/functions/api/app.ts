@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { ApiError } from "./errors.ts";
 import type { CreateJob, JobRow, Repository } from "./repository.ts";
+import { createPipeline, type PipelineOptions } from "./pipeline.ts";
 type Env = { Variables: { userId: string; requestId: string } };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function validId(id: string) {
@@ -47,7 +48,7 @@ function view(job: JobRow) {
     errorCode: job.error_code,
   };
 }
-export function createApp(repo: Repository) {
+export function createApp(repo: Repository, pipeline?: PipelineOptions) {
   const app = new Hono<Env>();
   app.use("*", async (c, next) => {
     c.set("requestId", crypto.randomUUID());
@@ -66,6 +67,7 @@ export function createApp(repo: Repository) {
   app.notFound((c) =>
     c.json({ error: { code: "not_found", requestId: c.get("requestId") } }, 404)
   );
+  if (pipeline) app.route("/", createPipeline(pipeline));
   app.use("*", async (c, next) => {
     const match = /^Bearer ([^\s]+)$/i.exec(
       c.req.header("Authorization") ?? "",

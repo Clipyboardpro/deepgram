@@ -28,7 +28,7 @@ jobs:
 
       - name: API tip ve birim testleri
         run: |
-          deno check --config backend/supabase/functions/deno.json backend/supabase/functions/api/index.ts scripts/api-smoke.ts
+          deno check --config backend/supabase/functions/deno.json backend/supabase/functions/api/index.ts scripts/api-smoke.ts scripts/dispatcher-smoke.ts
           deno test --allow-read --config backend/supabase/functions/deno.json backend/supabase/functions/tests/
 
       - name: OpenAPI doğrula
@@ -65,5 +65,5 @@ jobs:
           psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c 'select jobname, schedule from cron.job;'
           psql -h 127.0.0.1 -p 54322 -U postgres -d postgres -c 'select * from pgmq.list_queues();'
 
-      - name: Gerçek Auth Storage API smoke testi
+      - name: Gerçek Auth Storage API dispatcher webhook smoke testi
         run: bash scripts/api-smoke.sh
