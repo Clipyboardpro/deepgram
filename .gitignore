@@ -25,3 +25,7 @@ Thumbs.db
 
 # XcodeGen çıktısı (ios/App/project.yml kaynaktır)
 ios/App/*.xcodeproj/
+
+# iOS yerel yapılandırma (publishable anahtar; bkz. ios/App/Config)
+ios/App/Config/Secrets.xcconfig
+ios/App/Sources/App/Info.plist

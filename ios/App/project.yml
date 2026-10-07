@@ -27,6 +27,14 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+    configFiles:
+      Debug: Config/App.xcconfig
+      Release: Config/App.xcconfig
+    info:
+      path: Sources/App/Info.plist
+      properties:
+        SupabaseProjectRef: $(SUPABASE_PROJECT_REF)
+        SupabasePublishableKey: $(SUPABASE_PUBLISHABLE_KEY)
     dependencies:
       - package: EditorDomain
       - package: AIJobsClient

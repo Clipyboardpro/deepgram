@@ -29,6 +29,7 @@ struct ProjectDetailView: View {
 
 private struct EditorContent: View {
     @Bindable var editor: ProjectEditorModel
+    @Environment(AccountModel.self) private var account
     @State private var pickerItem: PhotosPickerItem?
 
     var body: some View {
@@ -45,6 +46,7 @@ private struct EditorContent: View {
                     .padding(.horizontal)
                 TransportBar(editor: editor)
                 TimelineStrip(editor: editor)
+                CaptionButton(editor: editor)
             }
             Spacer(minLength: 0)
         }
@@ -84,6 +86,19 @@ private struct EditorContent: View {
                 .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
             }
         }
+        .overlay {
+            if case let .working(text) = editor.captionState {
+                VStack(spacing: 12) {
+                    ProgressView(text)
+                    Button("Vazgeç", role: .cancel) { editor.cancelCaptioning() }
+                }
+                .padding()
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        .sheet(isPresented: $editor.needsSignIn) {
+            SignInView()
+        }
         .sheet(isPresented: Binding(
             get: { if case .finished = editor.exportState { true } else { false } },
             set: { if !$0 { editor.dismissExport() } }
@@ -94,6 +109,9 @@ private struct EditorContent: View {
             }
         }
         .task { await editor.refreshPreview() }
+        .onChange(of: editor.captionState) { _, state in
+            if state == .idle { Task { await account.refreshQuota() } }
+        }
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
             pickerItem = nil
@@ -114,6 +132,31 @@ private struct EditorContent: View {
         } message: {
             Text(editor.errorMessage ?? "")
         }
+    }
+}
+
+/// Altyazısı olmayan videolar için sunucuda otomatik altyazı başlatır.
+/// Oturum yoksa önce giriş ekranı açılır.
+private struct CaptionButton: View {
+    let editor: ProjectEditorModel
+    @Environment(AccountModel.self) private var account
+
+    var body: some View {
+        let hasTargets = !editor.captionTargets.isEmpty
+        Button {
+            guard let api = account.api else { return }
+            if account.isSignedIn {
+                editor.startCaptioning(api: api)
+            } else {
+                editor.needsSignIn = true
+            }
+        } label: {
+            Label(hasTargets ? "Otomatik altyazı" : "Altyazılar hazır", systemImage: "captions.bubble")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(!hasTargets || account.state == .unavailable || editor.captionState != .idle)
+        .padding(.horizontal)
     }
 }
 
