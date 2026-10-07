@@ -4,7 +4,9 @@ import ProjectLibrary
 
 struct ProjectLibraryView: View {
     @Environment(ProjectLibraryModel.self) private var library
+    @Environment(AccountModel.self) private var account
     @State private var path: [UUID] = []
+    @State private var showsAccount = false
     @State private var isNaming = false
     @State private var newTitle = ""
 
@@ -13,6 +15,12 @@ struct ProjectLibraryView: View {
             content
                 .navigationTitle("Projeler")
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button { showsAccount = true } label: {
+                            Label("Hesap", systemImage: account.isSignedIn ? "person.crop.circle.fill" : "person.crop.circle")
+                        }
+                        .disabled(account.state == .unavailable)
+                    }
                     ToolbarItem(placement: .primaryAction) {
                         Button {
                             newTitle = ""
@@ -21,6 +29,9 @@ struct ProjectLibraryView: View {
                             Label("Yeni proje", systemImage: "plus")
                         }
                     }
+                }
+                .sheet(isPresented: $showsAccount) {
+                    if account.isSignedIn { AccountView() } else { SignInView() }
                 }
                 .navigationDestination(for: UUID.self) { id in
                     ProjectDetailView(projectId: id)

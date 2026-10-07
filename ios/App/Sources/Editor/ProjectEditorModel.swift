@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import AIJobsClient
 import EditorDomain
 import MediaEngine
 import ProjectLibrary
@@ -123,6 +124,122 @@ final class ProjectEditorModel {
     func dismissExport() {
         if case let .finished(url) = exportState { try? FileManager.default.removeItem(at: url) }
         exportState = .idle
+    }
+
+    // MARK: - Otomatik altyazı
+
+    enum CaptionState: Equatable {
+        case idle
+        case working(String)
+    }
+
+    private(set) var captionState: CaptionState = .idle
+    /// Oturum yok/düştü: arayüz giriş ekranını açar.
+    var needsSignIn = false
+    @ObservationIgnored private var captionTask: Task<Void, Never>?
+
+    /// Altyazısı henüz olmayan, sesli ve zaman çizelgesinde kullanılan medyalar;
+    /// her biri için yalnız kliplerin kullandığı kaynak aralığı gönderilir.
+    var captionTargets: [(asset: MediaAsset, range: TimeRange)] {
+        let clips = document.tracks.flatMap(\.clips)
+        return document.mediaAssets.compactMap { asset in
+            guard asset.hasAudio, !document.captionTracks.contains(where: { $0.mediaId == asset.mediaId }) else { return nil }
+            let used = clips.filter { $0.mediaId == asset.mediaId }
+            guard let start = used.map(\.sourceIn).min(), let end = used.map(\.sourceOut).max(), start < end else { return nil }
+            return (asset, TimeRange(start: start, end: end))
+        }
+    }
+
+    func startCaptioning(api: AIJobsClient) {
+        guard captionTask == nil else { return }
+        let targets = captionTargets
+        guard !targets.isEmpty else { return }
+        let projectId = document.projectId
+        let work = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Captioning", isDirectory: true)
+        captionState = .working("Ses hazırlanıyor…")
+        playback.player.pause()
+
+        captionTask = Task { [repository] in
+            defer {
+                captionTask = nil
+                captionState = .idle
+            }
+            for (index, target) in targets.enumerated() {
+                let prefix = targets.count > 1 ? "(\(index + 1)/\(targets.count)) " : ""
+                let workflow = TranscriptionWorkflow(client: api, progress: { status in
+                    Task { @MainActor [weak self] in
+                        guard case .working = self?.captionState else { return }
+                        self?.captionState = .working(prefix + Self.statusText(status))
+                    }
+                })
+                let requestKey = Self.requestKey(projectId: projectId, mediaId: target.asset.mediaId, range: target.range)
+                do {
+                    let command = try await CaptioningService(workflow: workflow, workDirectory: work).caption(
+                        mediaId: target.asset.mediaId,
+                        source: repository.url(forMedia: target.asset.relativePath, in: projectId),
+                        range: target.range,
+                        clientRequestId: Self.clientRequestId(for: requestKey)
+                    )
+                    try apply(command)
+                    UserDefaults.standard.removeObject(forKey: requestKey)
+                } catch is CancellationError {
+                    return
+                } catch {
+                    handleCaptionError(error, requestKey: requestKey)
+                    return
+                }
+            }
+        }
+    }
+
+    func cancelCaptioning() {
+        captionTask?.cancel()
+    }
+
+    private func handleCaptionError(_ error: Error, requestKey: String) {
+        if let error = error as? AuthError {
+            if error == .signedOut { needsSignIn = true } else { errorMessage = error.userMessage }
+        } else if let error = error as? APIError {
+            if case .server(401, _, _) = error { needsSignIn = true } else { errorMessage = error.userMessage }
+        } else if let error = error as? WorkflowError {
+            switch error {
+            case .timedOut:
+                // İş sunucuda sürüyor olabilir; aynı istek kimliğiyle tekrar denenince ona bağlanır.
+                errorMessage = "Altyazı beklenenden uzun sürdü. Biraz sonra tekrar dene."
+            case .providerStateUnknown:
+                errorMessage = "Altyazı servisinden yanıt alınamadı. Daha sonra tekrar dene."
+            case .jobFailed, .jobCanceled, .resultUnavailable:
+                // Biten iş tekrar denenmez; yeni denemede yeni istek kimliği kullanılır.
+                UserDefaults.standard.removeObject(forKey: requestKey)
+                errorMessage = "Altyazı oluşturulamadı."
+            }
+        } else if error is MediaEngineError {
+            errorMessage = "Videonun sesi okunamadı."
+        } else {
+            errorMessage = "Altyazı oluşturulamadı."
+        }
+    }
+
+    /// Aynı medya ve aralık için iş başlamadan önce kalıcı saklanan istek kimliği:
+    /// uygulama yarıda kapanırsa tekrar denemede sunucu aynı işi döndürür.
+    private static func requestKey(projectId: UUID, mediaId: UUID, range: TimeRange) -> String {
+        "caption-request.\(projectId.uuidString).\(mediaId.uuidString).\(range.start.value)/\(range.start.timescale)-\(range.end.value)/\(range.end.timescale)"
+    }
+
+    private static func clientRequestId(for key: String) -> String {
+        if let existing = UserDefaults.standard.string(forKey: key) { return existing }
+        let id = UUID().uuidString.lowercased()
+        UserDefaults.standard.set(id, forKey: key)
+        return id
+    }
+
+    private static func statusText(_ status: JobStatus) -> String {
+        switch status {
+        case .awaitingUpload: "Ses yükleniyor…"
+        case .queued, .submitted: "Altyazı çıkarılıyor…"
+        default: "Altyazı hazırlanıyor…"
+        }
     }
 
     var document: ProjectDocument { history.present }

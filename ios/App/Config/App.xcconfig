@@ -1,0 +1,11 @@
+// Uygulama yapılandırması. URL'ler xcconfig'te "//" yorum sayıldığı için
+// yalnız Supabase proje kimliği yazılır; adres kodda kurulur.
+SUPABASE_PROJECT_REF = yjtpfyowzyszeoitlubx
+
+// Herkese açık (publishable/anon) anahtar. Tasarım gereği gizli değildir (RLS
+// korur) ama repoya eklenip eklenmeyeceği Eymen kararı; şimdilik yerel
+// Secrets.xcconfig dosyasından okunur (bkz. Secrets.example.xcconfig).
+// service_role / secret anahtar ASLA buraya ya da uygulamaya konmaz.
+SUPABASE_PUBLISHABLE_KEY =
+
+#include? "Secrets.xcconfig"
