@@ -1,6 +1,9 @@
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 const databaseCodes: Record<string, ContentfulStatusCode> = {
+  invalid_callback: 400,
+  audio_duration_mismatch: 400,
+  invalid_job_state: 409,
   insufficient_quota: 402,
   rate_limited: 429,
   audio_too_long: 413,

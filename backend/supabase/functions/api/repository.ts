@@ -124,6 +124,17 @@ export class SupabaseRepository implements Repository {
     if (Date.parse(job.upload_expires_at) <= Date.now()) {
       throw new ApiError(409, "upload_expired");
     }
+    const existing = await this.admin.storage.from(bucket).info(
+      job.storage_path,
+    );
+    if (!existing.error && existing.data) return null;
+    if (
+      existing.error &&
+      !("statusCode" in existing.error &&
+        String(existing.error.statusCode) === "404")
+    ) {
+      throw new ApiError(503, "storage_unavailable");
+    }
     const { data, error } = await this.admin.storage.from(bucket)
       .createSignedUploadUrl(job.storage_path, { upsert: false });
     if (error || !data) throw new ApiError(503, "storage_unavailable");
