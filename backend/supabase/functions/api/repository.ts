@@ -191,7 +191,7 @@ export class SupabaseRepository implements Repository {
         p_valid_for: `${config.validDays} days`,
       },
     );
-    return period !== null;
+    return Boolean(period?.id);
   }
 }
 export function repositoryFromEnvironment(): Repository {

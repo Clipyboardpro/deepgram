@@ -113,3 +113,34 @@ Deno.test("repository güncel Auth kaydından miktar/kimlik türetir; ikinci RPC
     }, pepper),
   );
 });
+
+Deno.test("anonim Auth kaydı config yokken de 403; miktar ayarı okunmaz", async () => {
+  const admin = {
+    auth: {
+      admin: {
+        getUserById: () =>
+          Promise.resolve({
+            data: { user: { id: "anon", is_anonymous: true } },
+            error: null,
+          }),
+      },
+    },
+  } as unknown as SupabaseClient;
+  let configCalls = 0;
+  const repo = new SupabaseRepository(
+    admin,
+    "fake",
+    "fake-v1",
+    "http://localhost",
+    () => {
+      configCalls++;
+      throw new Error("not configured");
+    },
+  );
+  await assertRejects(
+    () => repo.freeClaim("anon"),
+    ApiError,
+    "free_quota_not_eligible",
+  );
+  assertEquals(configCalls, 0);
+});
