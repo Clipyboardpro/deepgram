@@ -85,23 +85,32 @@ değildir; saldırganca hazırlanmış sample metadata'yı tam decode ederek kan
 tam decode kanıtı henüz yoktur. Deepgram callback süresi preflight ile en fazla
 250 ms farklı olabilir; daha büyük fark sonuç mutasyonu yapmadan reddedilir.
 
-## CX-007 · ücretsiz hak ve kesin ret
+## CX-007/008 · aylık ücretsiz hak ve kesin ret
 
 `POST /v1/quota/free-claim`: JWT zorunlu, boş gövde, yanıt `{granted:boolean}`.
 Auth.getUser ile doğrulanan kullanıcının güncel Auth kaydı tekrar okunur.
 Anonim veya doğrulanmamış e-posta (Apple kimliği yoksa) → 403
 `free_quota_not_eligible`. User metadata/client kimlik veya miktarı kullanılmaz.
 Apple identity_data.sub veya doğrulanmış küçük-harf e-posta, sunucu pepper'ıyla
-HMAC-SHA256 olur. Hash ve aynı kullanıcının free dönemi atomik kontrol edilir;
-tekrar / e-posta değişikliği / aynı kimlikle başka hesap yeni hak vermez.
-Hesap silinince hash tombstone korunur. Pepper sabit tutulmalı; döndürme işlemi
+HMAC-SHA256 olur. Ay başına kimlik ve kullanıcı benzersizliği atomik kontrol edilir;
+aynı ay tekrar / e-posta değişikliği / aynı kimlikle başka hesap yeni hak vermez.
+Hesap silinince ayın hash tombstone'u korunur. Pepper sabit tutulmalı; döndürme işlemi
 eski kimlik hash'lerini uzlaştırmadan yapılmamalı.
 
-`FREE_QUOTA_PEPPER` rastgele >=32 karakter, `FREE_QUOTA_SECONDS` pozitif integer,
-`FREE_QUOTA_VALID_DAYS` 1..365 integer; eksik/bozuk config → 503
-`free_quota_not_configured`. `.env.example` içindeki 60 sn / 7 gün yalnız yerel
-test yer tutucusudur, K4/ürün kararı değildir. Canlı örnek pepper kullanılamaz.
-Yeni migration onaylı deploy'dan önce uygulanmalı; bu PR canlıya uygulanmadı.
+`FREE_QUOTA_PEPPER` rastgele >=32 karakter, `FREE_QUOTA_SECONDS` pozitif integer;
+başlangıç değeri 900 sn/ay (Eymen CX-008 kararı). Eksik/bozuk config → 503
+`free_quota_not_configured`. `FREE_QUOTA_VALID_DAYS` kaldırıldı/yok sayılır.
+DB saati Europe/Istanbul ay başı/sonraki ay başını hesaplar; devretmez, cron gerekmez.
+GET /v1/quota ve ilk POST /v1/transcription-jobs rezervasyondan önce tembel hak verir.
+Uygun olmayan kimliğin bu yollarda ücretsiz hakkı atlanır, mevcut diğer kota işler;
+açık free-claim yine 403 verir. Auth/config/DB arızaları yutulmaz.
+Yeni monthly_free_quota_claims tablosu RLS ile istemciye kapalıdır; ay/zaman parametreli
+iç yardımcı service_role'a bile kapalıdır. API RPC'si zaman girdisi almaz.
+Eski tek-sefer RPC yeni aylık kurala yönlenir (interval yok sayılır); eski hash kayıtları
+verildikleri aya taşınır, eski free dönem bitişi ay sınırına kısaltılır. Geçmiş harcama
+ve rezervasyon kayıtları değişmez. Canlı örnek pepper kullanılamaz.
+Dağıtım Eymen tarafından onaylandı fakat yalnız CI yeşil + Claude PR merge sonrası yapılır.
+Auth ayarları değişmez, sağlayıcı fake kalır; ücretli Deepgram yok.
 
 Deepgram 4xx → ProviderRejected → `failed/provider_rejected` + rezervasyon
 iadesi + ack (kör retry yok). Fail RPC geçici hatası üç kez yeniden denenir;

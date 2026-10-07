@@ -80,16 +80,19 @@ try {
   );
   assert(price);
   priceId = price.id;
-  checked(
-    await admin.rpc("grant_quota", {
-      p_user_id: owner.id,
-      p_seconds: 60,
-      p_starts_at: new Date(Date.now() - 60000).toISOString(),
-      p_ends_at: new Date(Date.now() + 3600000).toISOString(),
-      p_source: "manual",
-      p_source_ref: run,
-    }),
-  );
+  const explicit = await identity();
+  assertEquals(await api("/v1/quota/free-claim", explicit.token, "POST"), {
+    granted: true,
+  });
+  assertEquals(await api("/v1/quota/free-claim", explicit.token, "POST"), {
+    granted: false,
+  });
+  const lazyQuota = await api("/v1/quota", other.token);
+  assertEquals(lazyQuota.periods.length, 1);
+  assertEquals(lazyQuota.periods[0].grantedSeconds, 900);
+  assertEquals(await api("/v1/quota/free-claim", other.token, "POST"), {
+    granted: false,
+  });
   const audio = await Deno.readFile(required("SMOKE_AUDIO_PATH"));
   const hash = Array.from(
     new Uint8Array(await crypto.subtle.digest("SHA-256", audio)),
@@ -131,6 +134,8 @@ try {
   await api("/v1/quota", "invalid-token", "GET", undefined, 401);
   const quota = await api("/v1/quota", owner.token);
   assertEquals(quota.periods[0].reservedSeconds, 1);
+  assertEquals(quota.periods[0].grantedSeconds, 900);
+  assertEquals(quota.periods[0].availableSeconds, 899);
   assertEquals(
     (await api(`/v1/jobs/${id}`, other.token, "GET", undefined, 404)).error
       .code,
@@ -160,6 +165,14 @@ try {
     )).error.code,
     "upload_not_found",
   );
+  // Yeni kullanıcının otomatik 900 saniyesini üç 300 sn iş ile ayır; dördüncü 402.
+  for (let n = 0; n < 3; n++) {
+    await api("/v1/transcription-jobs", other.token, "POST", {
+      ...input,
+      clientRequestId: crypto.randomUUID(),
+      durationSeconds: 300,
+    });
+  }
   assertEquals(
     (await api("/v1/transcription-jobs", other.token, "POST", {
       ...input,
@@ -216,7 +229,7 @@ try {
     0,
   );
   assertEquals(await api("/v1/quota/free-claim", owner.token, "POST"), {
-    granted: true,
+    granted: false,
   });
   assertEquals(await api("/v1/quota/free-claim", owner.token, "POST"), {
     granted: false,
@@ -225,9 +238,20 @@ try {
     period: { source: string },
   ) => period.source === "free");
   assertEquals(freePeriods.length, 1);
-  assertEquals(freePeriods[0].grantedSeconds, 60);
+  assertEquals(freePeriods[0].grantedSeconds, 900);
+  const currentMonth = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+  }).format(new Date());
+  const periodMonth = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Istanbul",
+    year: "numeric",
+    month: "2-digit",
+  }).format(new Date(freePeriods[0].startsAt));
+  assertEquals(periodMonth, currentMonth);
   console.log(
-    "PASS: gerçek Auth/JWT, kota, idempotency, sahiplik, signed upload, queued GET, cancel; dispatcher yok.",
+    "PASS CX-008: gerçek Auth/JWT; explicit true/false, GET lazy, ilk iş lazy 900 sn, tek aylık dönem; kota/idempotency/sahiplik/upload/cancel.",
   );
 } finally {
   if (paths.length) {

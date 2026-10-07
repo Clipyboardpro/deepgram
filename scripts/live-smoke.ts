@@ -12,7 +12,9 @@ assertEquals(env("LIVE_SMOKE_APPROVED"), "fake-create-and-cleanup");
 const admin = createClient(url, env("SUPABASE_SERVICE_ROLE_KEY"), {
   auth: { persistSession: false, autoRefreshToken: false },
 });
-const checked = <R extends { data: unknown; error: unknown }>(r: R): R["data"] => {
+const checked = <R extends { data: unknown; error: unknown }>(
+  r: R,
+): R["data"] => {
   if (r.error) {
     throw new Error("Live smoke operation failed (details suppressed)");
   }
@@ -47,9 +49,10 @@ async function api(
   token: string,
   body?: unknown,
   expected = 200,
+  method = body === undefined ? "GET" : "POST",
 ) {
   const r = await fetch(url + "/functions/v1/api" + path, {
-    method: body === undefined ? "GET" : "POST",
+    method,
     headers: {
       Authorization: "Bearer " + token,
       "Content-Type": "application/json",
@@ -66,16 +69,20 @@ async function api(
 try {
   const owner = await identity();
   const other = await identity();
-  checked(
-    await admin.rpc("grant_quota", {
-      p_user_id: owner.id,
-      p_seconds: 60,
-      p_starts_at: new Date(Date.now() - 60000).toISOString(),
-      p_ends_at: new Date(Date.now() + 3600000).toISOString(),
-      p_source: "manual",
-      p_source_ref: run,
-    }),
+  assertEquals(
+    await api("/v1/quota/free-claim", owner.token, undefined, 200, "POST"),
+    { granted: true },
   );
+  assertEquals(
+    await api("/v1/quota/free-claim", owner.token, undefined, 200, "POST"),
+    { granted: false },
+  );
+  const quota = await api("/v1/quota", owner.token);
+  assertEquals(quota.periods.length, 1);
+  assertEquals(quota.periods[0].grantedSeconds, 900);
+  assertEquals(quota.periods[0].availableSeconds, 900);
+  const lazy = await api("/v1/quota", other.token);
+  assertEquals(lazy.periods[0].grantedSeconds, 900);
   const audio = await Deno.readFile(env("SMOKE_AUDIO_PATH"));
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", audio))]
     .map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -132,7 +139,7 @@ try {
     1,
   );
   console.log(
-    "PASS CX-006: live Auth/RLS, signed upload, repeat 200/null, natural cron/net -> dispatcher -> fake callback -> succeeded; one ledger.",
+    "PASS CX-008: live free-claim true/false, GET quota 900 sn/lazy; Auth/RLS/upload, natural cron/net -> fake succeeded; one ledger.",
   );
 } finally {
   if (paths.length) {
@@ -140,6 +147,15 @@ try {
   }
   if (jobs.length) {
     checked(await admin.from("provider_events").delete().in("job_id", jobs));
+  }
+  // Yalnız bu testin hak tombstone'ları da temizlenir; gerçek haklar korunur.
+  if (users.length) {
+    checked(
+      await admin.from("monthly_free_quota_claims").delete().in(
+        "user_id",
+        users,
+      ),
+    );
   }
   for (const id of users) checked(await admin.auth.admin.deleteUser(id));
   console.log(

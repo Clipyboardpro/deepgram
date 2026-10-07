@@ -9,7 +9,7 @@ select is((public.grant_free_quota_once('00000000-0000-0000-0000-0000000000b7',r
 select is((public.grant_free_quota_once('00000000-0000-0000-0000-0000000000a7',repeat('8',64),60)).id,null::uuid,'aynı kullanıcı kimlik değiştirerek ikinci hak alamaz');
 select is((select count(*)::int from public.quota_periods where user_id='00000000-0000-0000-0000-0000000000a7' and source='free'),1,'tek ücretsiz dönem');
 select is((select sum(granted_seconds)::int from public.quota_periods where user_id='00000000-0000-0000-0000-0000000000a7'),60,'yer tutucu 60 saniye');
-select is((select ends_at-starts_at from public.quota_periods where user_id='00000000-0000-0000-0000-0000000000a7'),interval '7 days','yer tutucu 7 gün');
+select is((select ends_at from public.quota_periods where user_id='00000000-0000-0000-0000-0000000000a7'),(date_trunc('month',now() at time zone 'Europe/Istanbul')+interval '1 month') at time zone 'Europe/Istanbul','eski interval girdisi yerine takvim ayı');
 select throws_ok($$select public.grant_free_quota_once('00000000-0000-0000-0000-0000000000b7','bad',60)$$,'22023','invalid_identity_hash','bozuk kimlik reddedilir');
 select throws_ok($$select public.grant_free_quota_once('00000000-0000-0000-0000-0000000000b7',repeat('9',64),0)$$,'22023','invalid_seconds','sıfır miktar reddedilir');
 insert into public.provider_prices(provider,model,price_version,usd_micros_per_minute,valid_from)
@@ -21,7 +21,7 @@ select is((public.fail_job((select id from rejected_job),'provider_rejected','re
 select is((select reserved_seconds from public.quota_balance('00000000-0000-0000-0000-0000000000a7')),0,'kesin ret rezervasyonu bırakır');
 select is((select available_seconds from public.quota_balance('00000000-0000-0000-0000-0000000000a7')),60,'kesin ret tüm hak miktarını geri verir');
 delete from auth.users where id='00000000-0000-0000-0000-0000000000a7';
-select is((select count(*)::int from public.free_quota_claims where identity_hash=repeat('7',64)),1,'hesap silinse de hash tombstone kalır');
+select is((select count(*)::int from public.monthly_free_quota_claims where identity_hash=repeat('7',64)),1,'hesap silinse de ay hash tombstone kalır');
 select is((public.grant_free_quota_once('00000000-0000-0000-0000-0000000000b7',repeat('7',64),60)).id,null::uuid,'hesap silme/recreate hak sıfırlamaz');
 select * from finish();
 rollback;

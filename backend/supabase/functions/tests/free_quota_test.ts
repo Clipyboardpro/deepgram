@@ -1,6 +1,6 @@
 import { assertEquals, assertMatch, assertRejects } from "@std/assert";
 import { freeIdentityHash } from "../_shared/free-quota.ts";
-import { SupabaseRepository } from "../api/repository.ts";
+import { type CreateJob, SupabaseRepository } from "../api/repository.ts";
 import { ApiError } from "../api/errors.ts";
 import type { SupabaseClient } from "@supabase/supabase-js";
 const pepper = "mock-only-free-quota-pepper-00000000000000";
@@ -28,6 +28,75 @@ Deno.test("doğrulanmış e-posta küçük harf kimliğiyle, pepper'lı hash ür
       }, pepper + "other"),
     false,
   );
+});
+
+const jobInput: CreateJob = {
+  clientRequestId: "monthly-test-0001",
+  language: "tr",
+  audioSha256: "a".repeat(64),
+  audioBytes: 1000,
+  durationSeconds: 1,
+};
+function lazyFixture(eligible = true, fail = false) {
+  const calls: string[] = [];
+  const admin = {
+    auth: {
+      admin: {
+        getUserById: (id: string) =>
+          Promise.resolve({
+            data: {
+              user: eligible
+                ? {
+                  id,
+                  email: "verified@example.com",
+                  email_confirmed_at: "today",
+                }
+                : { id, is_anonymous: true },
+            },
+            error: null,
+          }),
+      },
+    },
+    rpc: (name: string) => {
+      calls.push(name);
+      return Promise.resolve({
+        data: name === "quota_balance" ? [] : { id: "period" },
+        error: fail ? { code: "XX000" } : null,
+      });
+    },
+  } as unknown as SupabaseClient;
+  return {
+    calls,
+    repo: new SupabaseRepository(
+      admin,
+      "fake",
+      "fake-v1",
+      "http://localhost",
+      () => ({ pepper, seconds: 900 }),
+    ),
+  };
+}
+Deno.test("ilk iş ücretsiz ay hakkını rezervasyondan önce tembel verir", async () => {
+  const { calls, repo } = lazyFixture();
+  await repo.create("owner", jobInput);
+  assertEquals(calls, ["grant_monthly_free_quota", "create_transcription_job"]);
+});
+Deno.test("kota sorgusu ay hakkını bakiyeden önce tembel verir", async () => {
+  const { calls, repo } = lazyFixture();
+  await repo.quota("owner");
+  assertEquals(calls, ["grant_monthly_free_quota", "quota_balance"]);
+});
+Deno.test("uygun olmayan kimlik lazy yollarda diğer kotasını korur", async () => {
+  const { calls, repo } = lazyFixture(false);
+  await repo.quota("owner");
+  await repo.create("owner", jobInput);
+  assertEquals(calls, ["quota_balance", "create_transcription_job"]);
+});
+Deno.test("lazy hak DB hatası rezervasyonu ve eksik bakiye dönüşünü engeller", async () => {
+  const { calls, repo } = lazyFixture(true, true);
+  await assertRejects(() => repo.create("owner", jobInput), ApiError);
+  await assertRejects(() => repo.quota("owner"), ApiError);
+  assertEquals(calls, ["grant_monthly_free_quota", "grant_monthly_free_quota"]);
 });
 Deno.test("anonim ve doğrulanmamış kimlik ücretsiz kota alamaz", async () => {
   for (
@@ -97,13 +166,13 @@ Deno.test("repository güncel Auth kaydından miktar/kimlik türetir; ikinci RPC
     "fake",
     "fake-v1",
     "http://localhost",
-    () => ({ pepper, seconds: 60, validDays: 7 }),
+    () => ({ pepper, seconds: 900 }),
   );
   assertEquals(await repo.freeClaim("trusted"), true);
   assertEquals(await repo.freeClaim("trusted"), false);
   assertEquals(args.p_user_id, "trusted");
-  assertEquals(args.p_seconds, 60);
-  assertEquals(args.p_valid_for, "7 days");
+  assertEquals(args.p_seconds, 900);
+  assertEquals(args.p_valid_for, undefined);
   assertEquals(
     args.p_identity_hash,
     await freeIdentityHash({

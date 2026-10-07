@@ -303,8 +303,20 @@ try {
     false,
   );
   const quota = await api("/v1/quota");
-  assertEquals(quota.periods[0].reservedSeconds, 0);
-  assertEquals(quota.periods[0].usedSeconds, 3);
+  assertEquals(
+    quota.periods.reduce(
+      (n: number, p: { reservedSeconds: number }) => n + p.reservedSeconds,
+      0,
+    ),
+    0,
+  );
+  assertEquals(
+    quota.periods.reduce(
+      (n: number, p: { usedSeconds: number }) => n + p.usedSeconds,
+      0,
+    ),
+    3,
+  );
   console.log(
     "PASS CX-003: Vault/pg_net -> dispatcher -> fake webhook -> succeeded; duplicate tek defter; fake resume submit tekrarı yok; 10 sn/1 sn beyan ve yanlış hash submit olmadan reddedildi; failure kotayı bıraktı; bulgu 1 tekrar yükleme 200/null.",
   );

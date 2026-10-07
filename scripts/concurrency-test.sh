@@ -99,17 +99,26 @@ check "eşzamanlı tekrar webhook tek sonuç yazıyor" 1 \
 # CX-007: aynı kullanıcı farklı kimlikle, sonra farklı kullanıcı aynı kimlikle yarışır.
 hold_barrier
 for i in $(seq 1 10); do
-  at_barrier "select public.grant_free_quota_once('$U1', lpad('$i',64,'e'), 60, interval '7 days')" &
+  at_barrier "select public.grant_monthly_free_quota('$U1', lpad('$i',64,'e'), 900)" &
 done
 wait
 check "aynı kullanıcının eşzamanlı farklı kimlikleri tek ücretsiz hak" 1 \
   "$("${PSQL[@]}" -c "select count(*) from public.quota_periods where user_id='$U1' and source='free'")"
 hold_barrier
 for user_id in "$U2" "$U3" "$U4"; do
-  at_barrier "select public.grant_free_quota_once('$user_id', repeat('f',64), 60, interval '7 days')" &
+  at_barrier "select public.grant_monthly_free_quota('$user_id', repeat('f',64), 900)" &
 done
 wait
 check "aynı kimlik eşzamanlı farklı kullanıcılara tek hak verir" 1 \
-  "$("${PSQL[@]}" -c "select count(*) from public.quota_periods where source_ref='free:' || repeat('f',64)")"
+  "$("${PSQL[@]}" -c "select count(*) from public.monthly_free_quota_claims where identity_hash=repeat('f',64)")"
+
+# Önceki ay hakkı bu ayın yarışını engellemez; yeni ayda da tek dönem.
+hold_barrier
+for i in $(seq 1 10); do
+  at_barrier "select public._grant_monthly_free_quota_at('$U1', repeat('a',64), 900, (date_trunc('month',now() at time zone 'Europe/Istanbul')+interval '1 month') at time zone 'Europe/Istanbul')" &
+done
+wait
+check "sonraki ay eşzamanlı yenileme tek yeni 900 saniyelik hak" "2|1800" \
+  "$("${PSQL[@]}" -c "select count(*) || '|' || sum(granted_seconds) from public.quota_periods where user_id='$U1' and source='free'")"
 
 exit $fail

@@ -875,7 +875,7 @@
       "post": {
         "operationId": "claimFreeQuota",
         "summary": "Doğrulanmış kimliğin tek ücretsiz hakkını talep et",
-        "description": "JWT zorunlu; gövde yok (gövde gönderilirse 400). Kimlik ve miktar istemciden alınmaz. Anonim veya e-postası doğrulanmamış (Apple kimliği olmayan) kullanıcı 403 free_quota_not_eligible. Tek hak atomik/idempotent; tekrar 200 granted:false. Miktar/geçerlilik sunucunun FREE_QUOTA_SECONDS/FREE_QUOTA_VALID_DAYS ayarı; 60 sn/7 gün yalnız test yer tutucusudur, K4 kararı değildir. Pepper/config eksikse 503 free_quota_not_configured. İstemci ardından GET /v1/quota okur.",
+        "description": "JWT zorunlu; gövde yok (gövde gönderilirse 400). Kimlik ve miktar istemciden alınmaz. Anonim veya e-postası doğrulanmamış (Apple kimliği olmayan) kullanıcı 403 free_quota_not_eligible. Europe/Istanbul takvim ayında kimlik ve kullanıcı başına tek hak; aynı ay tekrar 200 granted:false, yeni ayda yenilenir, devretmez. Miktar FREE_QUOTA_SECONDS; başlangıç 900 sn/ay. FREE_QUOTA_VALID_DAYS kullanılmaz. GET /v1/quota ve iş oluşturma da hakkı tembel/idempotent verir; bu yollar uygun olmayan kimliğe ücretsiz hak vermez fakat diğer kotayı korur. Pepper/config eksikse 503 free_quota_not_configured. İstemci ardından GET /v1/quota okur.",
         "responses": {
           "200": {"description": "granted bu çağrıda yeni hak verildi mi?", "content": {"application/json": {"schema": {"type": "object", "required": ["granted"], "properties": {"granted": {"type": "boolean"}}}}}},
           "400": {"description": "Gövde kabul edilmez.", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}},

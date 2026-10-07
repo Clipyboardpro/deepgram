@@ -78,7 +78,8 @@ export class SupabaseRepository implements Repository {
     if (error) throw databaseError(error);
     return data as T;
   }
-  create(userId: string, input: CreateJob): Promise<JobRow> {
+  async create(userId: string, input: CreateJob): Promise<JobRow> {
+    await this.ensureMonthlyFree(userId);
     return this.rpc("create_transcription_job", {
       p_user_id: userId,
       p_client_request_id: input.clientRequestId,
@@ -170,8 +171,21 @@ export class SupabaseRepository implements Repository {
       }
       : null;
   }
-  quota(userId: string): Promise<QuotaPeriod[]> {
+  async quota(userId: string): Promise<QuotaPeriod[]> {
+    await this.ensureMonthlyFree(userId);
     return this.rpc("quota_balance", { p_user_id: userId });
+  }
+  private async ensureMonthlyFree(userId: string): Promise<void> {
+    try {
+      await this.freeClaim(userId);
+    } catch (error) {
+      // Uygun olmayan kimlik mevcut ücretli/manual kotasını kullanabilir.
+      // Config/Auth/DB hatasını yutmayız: sessiz 402 veya yanlış bakiye olmaz.
+      if (
+        !(error instanceof ApiError && error.status === 403 &&
+          error.code === "free_quota_not_eligible")
+      ) throw error;
+    }
   }
   async freeClaim(userId: string): Promise<boolean> {
     // Auth.getUser ile doğrulanan id'nin güncel Auth kaydı; client metadata yok.
@@ -183,12 +197,11 @@ export class SupabaseRepository implements Repository {
     const config = this.freeConfig();
     const identityHash = await freeIdentityHash(data.user, config.pepper);
     const period = await this.rpc<{ id: string } | null>(
-      "grant_free_quota_once",
+      "grant_monthly_free_quota",
       {
         p_user_id: userId,
         p_identity_hash: identityHash,
         p_seconds: config.seconds,
-        p_valid_for: `${config.validDays} days`,
       },
     );
     return Boolean(period?.id);

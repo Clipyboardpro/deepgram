@@ -9,20 +9,17 @@ export interface FreeQuotaIdentity {
 export interface FreeQuotaConfig {
   pepper: string;
   seconds: number;
-  validDays: number;
 }
 export function freeQuotaConfig(): FreeQuotaConfig {
   const pepper = Deno.env.get("FREE_QUOTA_PEPPER") ?? "";
   const seconds = Number(Deno.env.get("FREE_QUOTA_SECONDS"));
-  const validDays = Number(Deno.env.get("FREE_QUOTA_VALID_DAYS"));
   if (
     pepper.length < 32 || !Number.isSafeInteger(seconds) || seconds < 1 ||
-    seconds > 2147483647 ||
-    !Number.isSafeInteger(validDays) || validDays < 1 || validDays > 365
+    seconds > 2147483647
   ) {
     throw new ApiError(503, "free_quota_not_configured");
   }
-  return { pepper, seconds, validDays };
+  return { pepper, seconds };
 }
 export function freeIdentity(user: FreeQuotaIdentity): string {
   if (user.is_anonymous) throw new ApiError(403, "free_quota_not_eligible");
